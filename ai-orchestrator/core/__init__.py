@@ -1,4 +1,6 @@
-"""Core orchestration engine, governance, prompt compiler, schema validator, IR pipeline, and efficiency stats."""
+"""Symphony-IR core: orchestration engine, governance, prompt compiler, schema validator, IR pipeline, and efficiency stats."""
+
+__version__ = "1.0.0a1"
 
 from .orchestrator import (
     OrchestratorState,
@@ -26,6 +28,7 @@ from .schema_validator import (
     ValidationReport,
 )
 from .prompt_ir import (
+    IR_SCHEMA_VERSION,
     PhaseType,
     PromptIR,
     PromptIRBuilder,
@@ -71,6 +74,7 @@ __all__ = [
     "IRGovernanceChecker",
     "PromptIRPipeline",
     "IRTransformation",
+    "IR_SCHEMA_VERSION",
     "EfficiencyCalculator",
     "RunStats",
     "ABComparison",

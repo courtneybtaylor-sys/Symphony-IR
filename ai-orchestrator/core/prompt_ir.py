@@ -1,4 +1,4 @@
-"""Prompt IR (Intermediate Representation) - Structured compiler pipeline.
+"""Symphony-IR: Prompt Intermediate Representation — Compiler Pipeline.
 
 This is the AST (Abstract Syntax Tree) for prompts. Transforms the system from
 "string plumbing" into a real compiler pipeline with inspectable IR.
@@ -13,6 +13,18 @@ Why this matters:
   - Meaningful metrics per field
   - Versioned IR schemas
   - Safe extensibility
+
+IR Schema Version: 1.0 (FROZEN)
+=================================
+This schema is frozen as of v1.0.0-alpha. All fields documented below are
+part of the stable public API. Breaking changes require a major version bump.
+
+Guarantees:
+  - All PromptIR fields listed in v1.0 will remain present in future 1.x releases
+  - New optional fields may be added (with defaults) in minor releases
+  - Serialization format (to_dict/from_dict) is stable and backwards-compatible
+  - Plugin transform() signature is stable: (PromptIR) -> PromptIR
+  - Pipeline process() signature is stable: (PromptIR) -> (PromptIR, bool, List[str])
 """
 
 import hashlib
@@ -25,6 +37,9 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# Frozen IR schema version — bump only on breaking changes
+IR_SCHEMA_VERSION = "1.0"
 
 
 class PhaseType(Enum):
@@ -70,8 +85,8 @@ class PromptIR:
     # Schema reference
     schema_id: str = "default"  # Validation schema reference
 
-    # Versioning
-    ir_version: str = "1.0"  # IR schema version
+    # Versioning (frozen — do not change without major version bump)
+    ir_version: str = IR_SCHEMA_VERSION  # IR schema version
 
     # Metadata (extensibility point)
     metadata: Dict[str, Any] = field(default_factory=dict)

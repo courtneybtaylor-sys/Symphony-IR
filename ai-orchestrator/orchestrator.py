@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""AI Orchestrator CLI - Deterministic multi-agent coordination engine.
+"""Symphony-IR CLI — Compiler-grade runtime for multi-model AI orchestration.
 
 Commands:
-    init    - Initialize .orchestrator/ directory with config templates
-    run     - Execute an orchestration run
-    status  - Show context provider availability
-    history - Show recent orchestration runs
+    init       - Initialize .symphony/ directory with config templates
+    run        - Execute an orchestration run
+    status     - Show context provider availability
+    history    - Show recent orchestration runs
+    efficiency - Generate A/B efficiency report from run ledgers
 """
 
 import argparse
@@ -26,6 +27,7 @@ from core.governance import MaaTGovernanceEngine
 from core.prompt_compiler import PromptCompiler
 from core.schema_validator import SchemaValidator
 from core.prompt_ir import (
+    IR_SCHEMA_VERSION,
     PromptIRPipeline,
     ContextDigestPlugin,
     BudgetOptimizerPlugin,
@@ -41,11 +43,11 @@ from context.providers import (
     ActiveFileContext,
 )
 
-logger = logging.getLogger("orchestrator")
+logger = logging.getLogger("symphony")
 
 # Default agents.yaml template
 AGENTS_YAML_TEMPLATE = """\
-# AI Orchestrator Agent Configuration
+# Symphony-IR Agent Configuration
 # Environment variables use ${VAR_NAME} syntax
 
 agents:
@@ -184,7 +186,7 @@ system:
 """
 
 ENV_TEMPLATE = """\
-# AI Orchestrator Environment Configuration
+# Symphony-IR Environment Configuration
 # Copy this to .env and fill in your API keys
 
 # Anthropic (Claude)
@@ -199,9 +201,9 @@ OPENAI_API_KEY=
 
 
 def cmd_init(args):
-    """Initialize .orchestrator/ directory."""
+    """Initialize .symphony/ directory."""
     project_root = Path(args.project).resolve()
-    orch_dir = project_root / ".orchestrator"
+    orch_dir = project_root / ".symphony"
 
     if orch_dir.exists() and not args.force:
         print(f"Directory {orch_dir} already exists. Use --force to overwrite.")
@@ -227,22 +229,30 @@ def cmd_init(args):
         env_file.write_text(ENV_TEMPLATE)
         print(f"  Created {env_file}")
 
-    print(f"\nInitialized orchestrator at {orch_dir}")
+    print(f"\nSymphony-IR initialized at {orch_dir}")
+    print(f"\nIR Schema Version: {IR_SCHEMA_VERSION}")
     print("\nNext steps:")
     print(f"  1. Edit {env_file} with your API keys")
     print(f"  2. Customize {agents_path} as needed")
-    print(f'  3. Run: python orchestrator.py run "your task here"')
+    print('  3. Run: symphony run "your task here"')
     return 0
 
 
 def cmd_run(args):
     """Execute an orchestration run."""
     project_root = Path(args.project).resolve()
-    orch_dir = project_root / ".orchestrator"
+
+    # Support both .symphony and legacy .orchestrator directories
+    orch_dir = project_root / ".symphony"
+    if not orch_dir.exists():
+        legacy_dir = project_root / ".orchestrator"
+        if legacy_dir.exists():
+            orch_dir = legacy_dir
+
     task = args.task
 
     if not task:
-        print("Error: No task specified. Usage: orchestrator run <task>")
+        print("Error: No task specified. Usage: symphony run <task>")
         return 1
 
     # Set up logging
@@ -280,7 +290,7 @@ def cmd_run(args):
             print("Falling back to mock agents.")
             use_mock = True
     else:
-        print("No agents.yaml found. Run 'orchestrator init' first, or using mock agents.")
+        print("No agents.yaml found. Run 'symphony init' first, or using mock agents.")
         use_mock = True
 
     if use_mock:
@@ -330,6 +340,7 @@ def cmd_run(args):
                 governance=ir_governance,
             )
             print(f"  IR pipeline: enabled ({len(ir_plugins)} plugins, governance active)")
+            print(f"  IR schema: v{IR_SCHEMA_VERSION}")
 
     # Create agent executor
     def agent_executor(agent_name, phase_brief, ctx):
@@ -370,13 +381,13 @@ def cmd_run(args):
         print(f"Context providers: {context_manager.get_summary()}")
         print(f"Prompt compiler: {'enabled (' + str(len(compiler.list_templates())) + ' templates)' if compiler else 'disabled'}")
         print(f"Schema validator: {'enabled' if validator else 'disabled'}")
-        print(f"IR pipeline: {'enabled' if ir_pipeline else 'disabled'}")
+        print(f"IR pipeline: {'enabled (v' + IR_SCHEMA_VERSION + ')' if ir_pipeline else 'disabled'}")
         print(f"Config: {system_config}")
         print("--- END DRY RUN ---")
         return 0
 
     # Execute
-    print(f"\nRunning orchestration for: {task}")
+    print(f"\nSymphony-IR: Running orchestration for: {task}")
     print("-" * 60)
 
     ledger = orchestrator.run(task, context)
@@ -420,7 +431,7 @@ def cmd_run(args):
 
         if ir_pipeline:
             stats = ir_pipeline.get_pipeline_stats()
-            print(f"\nIR Pipeline Stats:")
+            print(f"\nIR Pipeline Stats (v{IR_SCHEMA_VERSION}):")
             print(f"  Pipeline runs:      {stats.get('total_runs', 0)}")
             print(f"  Transformations:    {stats.get('total_transformations', 0)}")
             print(f"  Avg transforms/run: {stats.get('avg_transformations_per_run', 0):.1f}")
@@ -452,22 +463,29 @@ def cmd_status(args):
     context_manager.add_provider(FileSystemContext(str(project_root)))
     context_manager.add_provider(GitContext(str(project_root)))
 
+    print(f"Symphony-IR Status (IR Schema v{IR_SCHEMA_VERSION})")
+    print("-" * 40)
     print(context_manager.get_summary())
 
-    # Check orchestrator directory
-    orch_dir = project_root / ".orchestrator"
-    print(f"\nOrchestrator directory: {'exists' if orch_dir.exists() else 'not initialized'}")
+    # Check symphony directory (support legacy .orchestrator too)
+    orch_dir = project_root / ".symphony"
+    legacy_dir = project_root / ".orchestrator"
+    active_dir = orch_dir if orch_dir.exists() else (legacy_dir if legacy_dir.exists() else None)
 
-    if orch_dir.exists():
-        agents_yaml = orch_dir / "agents.yaml"
-        env_file = orch_dir / ".env"
+    if active_dir:
+        print(f"\nSymphony directory: {active_dir}")
+        agents_yaml = active_dir / "agents.yaml"
+        env_file = active_dir / ".env"
         print(f"  agents.yaml: {'found' if agents_yaml.exists() else 'missing'}")
         print(f"  .env:        {'found' if env_file.exists() else 'missing'}")
 
-        runs_dir = orch_dir / "runs"
+        runs_dir = active_dir / "runs"
         if runs_dir.exists():
             runs = list(runs_dir.glob("*.json"))
             print(f"  runs:        {len(runs)} saved")
+    else:
+        print(f"\nSymphony directory: not initialized")
+        print("  Run 'symphony init' to get started.")
 
     return 0
 
@@ -475,10 +493,14 @@ def cmd_status(args):
 def cmd_history(args):
     """Show recent orchestration runs."""
     project_root = Path(args.project).resolve()
-    runs_dir = project_root / ".orchestrator" / "runs"
+
+    # Support both .symphony and legacy .orchestrator
+    runs_dir = project_root / ".symphony" / "runs"
+    if not runs_dir.exists():
+        runs_dir = project_root / ".orchestrator" / "runs"
 
     if not runs_dir.exists():
-        print("No runs found. Run 'orchestrator init' and then 'orchestrator run <task>' first.")
+        print("No runs found. Run 'symphony init' and then 'symphony run <task>' first.")
         return 1
 
     runs = sorted(runs_dir.glob("*.json"), reverse=True)
@@ -488,7 +510,7 @@ def cmd_history(args):
         print("No runs found.")
         return 0
 
-    print(f"Recent runs (showing {min(limit, len(runs))} of {len(runs)}):")
+    print(f"Symphony-IR Run History (showing {min(limit, len(runs))} of {len(runs)}):")
     print("-" * 80)
 
     for run_file in runs[:limit]:
@@ -518,7 +540,11 @@ def cmd_history(args):
 def cmd_efficiency(args):
     """Generate A/B efficiency report from run ledgers."""
     project_root = Path(args.project).resolve()
-    runs_dir = project_root / ".orchestrator" / "runs"
+
+    # Support both .symphony and legacy .orchestrator
+    runs_dir = project_root / ".symphony" / "runs"
+    if not runs_dir.exists():
+        runs_dir = project_root / ".orchestrator" / "runs"
 
     if not runs_dir.exists():
         print("No runs found. Run some orchestrations first.")
@@ -529,6 +555,7 @@ def cmd_efficiency(args):
         print("No run ledgers found.")
         return 1
 
+    print(f"Symphony-IR Efficiency Report (IR Schema v{IR_SCHEMA_VERSION})")
     print(f"Parsing {len(run_files)} run ledgers...")
 
     compiled_runs, raw_runs = RunLedgerParser.parse_multiple_ledgers(
@@ -618,13 +645,13 @@ def _setup_mock_agents(registry: AgentRegistry):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="AI Orchestrator - Deterministic multi-agent coordination engine",
+        description="Symphony-IR — Compiler-grade runtime for multi-model AI orchestration",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # init
-    init_parser = subparsers.add_parser("init", help="Initialize .orchestrator/ directory")
+    init_parser = subparsers.add_parser("init", help="Initialize .symphony/ directory")
     init_parser.add_argument(
         "--project", default=".", help="Project root directory (default: current dir)"
     )
