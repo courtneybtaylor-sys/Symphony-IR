@@ -144,6 +144,7 @@ class Orchestrator:
         prompt_compiler: Optional[Any] = None,
         schema_validator: Optional[Any] = None,
         agent_provider_resolver: Optional[Callable] = None,
+        ir_pipeline: Optional[Any] = None,
     ):
         """Initialize the orchestrator.
 
@@ -155,6 +156,7 @@ class Orchestrator:
             prompt_compiler: Optional PromptCompiler for token-optimized prompts
             schema_validator: Optional SchemaValidator for output format enforcement
             agent_provider_resolver: Callable(agent_name) -> str (model provider name)
+            ir_pipeline: Optional PromptIRPipeline for structured IR transformations
         """
         config = config or {}
         self.max_phases = config.get("max_phases", 10)
@@ -168,6 +170,7 @@ class Orchestrator:
         self._prompt_compiler = prompt_compiler
         self._schema_validator = schema_validator
         self._agent_provider_resolver = agent_provider_resolver
+        self._ir_pipeline = ir_pipeline
 
         self._state = OrchestratorState.INIT
         self._ledger: Optional[RunLedger] = None
@@ -288,6 +291,15 @@ class Orchestrator:
                     stats,
                 )
 
+            if self._ir_pipeline:
+                stats = self._ir_pipeline.get_pipeline_stats()
+                self._record_decision(
+                    "IR pipeline stats",
+                    f"runs={stats.get('total_runs', 0)}, "
+                    f"transformations={stats.get('total_transformations', 0)}",
+                    stats,
+                )
+
             # TERMINATE
             self._transition(OrchestratorState.TERMINATE)
             self._ledger.state = OrchestratorState.TERMINATE.value
@@ -342,9 +354,13 @@ class Orchestrator:
             logger.warning("No agent executor set, returning empty responses")
             return responses
 
-        # Compile prompts if compiler is available
+        # Compile prompts: IR pipeline path or direct compilation
         compiled_briefs = {}
-        if self._prompt_compiler:
+        if self._ir_pipeline and self._prompt_compiler:
+            # IR pipeline path: construct IR -> pipeline -> compile from IR
+            self._compile_via_ir_pipeline(phase, context, compiled_briefs)
+        elif self._prompt_compiler:
+            # Direct compilation path (backwards-compatible)
             for agent_name in phase.agents:
                 try:
                     provider = "mock"
@@ -477,6 +493,93 @@ class Orchestrator:
                     )
 
         return responses
+
+    def _compile_via_ir_pipeline(
+        self,
+        phase: Phase,
+        context: Dict,
+        compiled_briefs: Dict,
+    ):
+        """Compile prompts via the IR pipeline.
+
+        Flow: Construct IR -> Governance check -> Plugin transforms -> Compile from IR
+        """
+        from .prompt_ir import PhaseType, PromptIRBuilder
+
+        # Map phase names to PhaseType
+        phase_type_map = {
+            "analysis": PhaseType.PLANNING,
+            "planning": PhaseType.PLANNING,
+            "research": PhaseType.RESEARCH,
+            "implementation": PhaseType.IMPLEMENTATION,
+            "review": PhaseType.REVIEW,
+            "synthesis": PhaseType.SYNTHESIS,
+            "integration": PhaseType.SYNTHESIS,
+        }
+        phase_type = phase_type_map.get(
+            phase.name.lower(), PhaseType.IMPLEMENTATION
+        )
+
+        # Build context refs from context dict
+        context_refs = []
+        fs_context = context.get("filesystem", {})
+        for filename in fs_context.get("key_files", {}):
+            context_refs.append(f"file:{filename}")
+        if context.get("git"):
+            context_refs.append(f"diff:{context['git'].get('branch', 'main')}")
+
+        for agent_name in phase.agents:
+            if not self._prompt_compiler.has_template(agent_name):
+                continue
+
+            try:
+                provider = "mock"
+                if self._agent_provider_resolver:
+                    provider = self._agent_provider_resolver(agent_name)
+
+                # Build IR
+                ir = (
+                    PromptIRBuilder(agent_name, phase.brief)
+                    .phase(phase_type)
+                    .add_context_refs(context_refs)
+                    .set_model_hint(provider)
+                    .set_token_budget(3000)
+                    .set_priority(5)
+                    .build()
+                )
+
+                # Process through IR pipeline
+                transformed_ir, approved, violations = self._ir_pipeline.process(ir)
+
+                if not approved:
+                    self._record_decision(
+                        f"IR governance denied for {agent_name}",
+                        f"violations={violations}",
+                    )
+                    continue
+
+                # Compile from transformed IR
+                compiled = self._prompt_compiler.compile_from_ir(transformed_ir)
+                compiled_briefs[agent_name] = compiled
+
+                self._record_decision(
+                    f"IR pipeline compiled for {agent_name}",
+                    f"ir_id={transformed_ir.ir_id}, "
+                    f"tokens={compiled.estimated_tokens}, "
+                    f"budget={transformed_ir.token_budget}",
+                    {
+                        **compiled.compilation_metadata,
+                        "ir_approved": approved,
+                        "ir_violations": violations,
+                    },
+                )
+
+            except Exception as e:
+                logger.warning(
+                    "IR pipeline compilation failed for %s: %s, using raw brief",
+                    agent_name,
+                    e,
+                )
 
     def _synthesize(self, responses: List[AgentResponse]) -> str:
         """Combine agent outputs into a synthesis."""

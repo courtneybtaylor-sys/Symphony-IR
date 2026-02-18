@@ -25,6 +25,13 @@ from core.orchestrator import Orchestrator, AgentResponse, OrchestratorState
 from core.governance import MaaTGovernanceEngine
 from core.prompt_compiler import PromptCompiler
 from core.schema_validator import SchemaValidator
+from core.prompt_ir import (
+    PromptIRPipeline,
+    ContextDigestPlugin,
+    BudgetOptimizerPlugin,
+    IRGovernanceChecker,
+)
+from core.efficiency_stats import EfficiencyCalculator, RunLedgerParser
 from models.client import ModelFactory, MockModelClient
 from agents.agent import Agent, AgentConfig, AgentRegistry
 from context.providers import (
@@ -295,6 +302,7 @@ def cmd_run(args):
     # Set up prompt compiler
     compiler = None
     validator = None
+    ir_pipeline = None
     if not args.no_compile:
         templates_path = orch_dir if (orch_dir / "prompt_templates.yaml").exists() else PACKAGE_DIR / "config"
         try:
@@ -309,6 +317,19 @@ def cmd_run(args):
 
         validator = SchemaValidator(config=system_config.get("schema_validator"))
         print(f"  Schema validator: enabled (auto_repair={validator.config.get('auto_repair', True)})")
+
+        # Set up IR pipeline (unless --no-ir flag)
+        if not args.no_ir and compiler:
+            ir_governance = IRGovernanceChecker()
+            ir_plugins = [
+                ContextDigestPlugin(config={"max_context_refs": 10}),
+                BudgetOptimizerPlugin(),
+            ]
+            ir_pipeline = PromptIRPipeline(
+                plugins=ir_plugins,
+                governance=ir_governance,
+            )
+            print(f"  IR pipeline: enabled ({len(ir_plugins)} plugins, governance active)")
 
     # Create agent executor
     def agent_executor(agent_name, phase_brief, ctx):
@@ -339,6 +360,7 @@ def cmd_run(args):
         prompt_compiler=compiler,
         schema_validator=validator,
         agent_provider_resolver=agent_provider_resolver,
+        ir_pipeline=ir_pipeline,
     )
 
     if args.dry_run:
@@ -348,6 +370,7 @@ def cmd_run(args):
         print(f"Context providers: {context_manager.get_summary()}")
         print(f"Prompt compiler: {'enabled (' + str(len(compiler.list_templates())) + ' templates)' if compiler else 'disabled'}")
         print(f"Schema validator: {'enabled' if validator else 'disabled'}")
+        print(f"IR pipeline: {'enabled' if ir_pipeline else 'disabled'}")
         print(f"Config: {system_config}")
         print("--- END DRY RUN ---")
         return 0
@@ -394,6 +417,21 @@ def cmd_run(args):
             print(f"  Validations:    {stats.get('total_validations', 0)}")
             print(f"  Success rate:   {stats.get('success_rate', 0):.1%}")
             print(f"  Repair rate:    {stats.get('repair_rate', 0):.1%}")
+
+        if ir_pipeline:
+            stats = ir_pipeline.get_pipeline_stats()
+            print(f"\nIR Pipeline Stats:")
+            print(f"  Pipeline runs:      {stats.get('total_runs', 0)}")
+            print(f"  Transformations:    {stats.get('total_transformations', 0)}")
+            print(f"  Avg transforms/run: {stats.get('avg_transformations_per_run', 0):.1f}")
+
+            if ir_pipeline.governance:
+                gov_report = ir_pipeline.governance.get_violations_report()
+                print(f"\nIR Governance:")
+                print(f"  Checks:       {gov_report.get('total_checks', 0)}")
+                print(f"  Approved:     {gov_report.get('approved', 0)}")
+                print(f"  Denied:       {gov_report.get('denied', 0)}")
+                print(f"  Approval rate:{gov_report.get('approval_rate', 0):.1%}")
 
     # Export compiler/validator logs
     logs_dir = orch_dir / "logs"
@@ -477,6 +515,66 @@ def cmd_history(args):
     return 0
 
 
+def cmd_efficiency(args):
+    """Generate A/B efficiency report from run ledgers."""
+    project_root = Path(args.project).resolve()
+    runs_dir = project_root / ".orchestrator" / "runs"
+
+    if not runs_dir.exists():
+        print("No runs found. Run some orchestrations first.")
+        return 1
+
+    run_files = sorted(runs_dir.glob("*.json"))
+    if not run_files:
+        print("No run ledgers found.")
+        return 1
+
+    print(f"Parsing {len(run_files)} run ledgers...")
+
+    compiled_runs, raw_runs = RunLedgerParser.parse_multiple_ledgers(
+        [str(f) for f in run_files]
+    )
+
+    if not compiled_runs and not raw_runs:
+        print("No valid runs found in ledgers.")
+        return 1
+
+    calculator = EfficiencyCalculator()
+    report_format = "json" if args.json else "text"
+
+    # If we only have compiled or only raw runs, show stats for what we have
+    if not raw_runs:
+        print("Note: No raw (uncompiled) runs found. Showing compiled stats only.")
+        stats = calculator.summarize_runs(compiled_runs)
+        print(f"\nCompiled Runs: {stats.run_count}")
+        print(f"  Avg Tokens:   {stats.avg_total_tokens:,.0f}")
+        print(f"  Avg Duration: {stats.avg_duration_seconds:.2f}s")
+        print(f"  Avg Retries:  {stats.avg_retries:.2f}")
+        print(f"  Avg Cost:     ${stats.avg_cost_usd:.4f}")
+        return 0
+
+    if not compiled_runs:
+        print("Note: No compiled runs found. Showing raw stats only.")
+        stats = calculator.summarize_runs(raw_runs)
+        print(f"\nRaw Runs: {stats.run_count}")
+        print(f"  Avg Tokens:   {stats.avg_total_tokens:,.0f}")
+        print(f"  Avg Duration: {stats.avg_duration_seconds:.2f}s")
+        print(f"  Avg Retries:  {stats.avg_retries:.2f}")
+        print(f"  Avg Cost:     ${stats.avg_cost_usd:.4f}")
+        return 0
+
+    report = calculator.generate_roi_report(compiled_runs, raw_runs, format=report_format)
+    print(report)
+
+    # Export if requested
+    if args.export:
+        comparison = calculator.compare(compiled_runs, raw_runs)
+        calculator.export_comparison(comparison, args.export)
+        print(f"\nReport exported to: {args.export}")
+
+    return 0
+
+
 def _load_env_file(path: str):
     """Load environment variables from a .env file."""
     try:
@@ -551,6 +649,10 @@ def main():
         "--no-compile", action="store_true",
         help="Disable prompt compiler and schema validator",
     )
+    run_parser.add_argument(
+        "--no-ir", action="store_true",
+        help="Disable IR pipeline (use direct compilation instead)",
+    )
 
     # status
     status_parser = subparsers.add_parser(
@@ -572,6 +674,20 @@ def main():
         "--detailed", action="store_true", help="Show full decision chains"
     )
 
+    # efficiency
+    eff_parser = subparsers.add_parser(
+        "efficiency", help="Generate A/B efficiency report from run ledgers"
+    )
+    eff_parser.add_argument(
+        "--project", default=".", help="Project root directory (default: current dir)"
+    )
+    eff_parser.add_argument(
+        "--json", action="store_true", help="Output in JSON format"
+    )
+    eff_parser.add_argument(
+        "--export", type=str, help="Export report to file"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -583,6 +699,7 @@ def main():
         "run": cmd_run,
         "status": cmd_status,
         "history": cmd_history,
+        "efficiency": cmd_efficiency,
     }
 
     return commands[args.command](args)

@@ -20,9 +20,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import yaml
+
+if TYPE_CHECKING:
+    from .prompt_ir import PromptIR
 
 logger = logging.getLogger(__name__)
 
@@ -556,6 +559,96 @@ class PromptCompiler:
                 indent=2,
             )
         logger.info("Compilation log exported to %s", filepath)
+
+    def compile_from_ir(self, ir: "PromptIR") -> CompiledPrompt:
+        """Compile from a PromptIR instead of raw parameters.
+
+        This is the new primary interface for the structured compiler pipeline.
+        Resolves context references, then delegates to the standard compile().
+
+        Args:
+            ir: A PromptIR instance with structured intent, context refs, etc.
+
+        Returns:
+            CompiledPrompt ready for model dispatch
+        """
+        # Resolve context references to actual context data
+        context = self._resolve_context_refs(ir.context_refs, ir.metadata)
+
+        # Build token budget from IR
+        budget = TokenBudget(max_input_tokens=ir.token_budget)
+
+        # Use existing compilation pipeline
+        compiled = self.compile(
+            role=ir.role,
+            phase_brief=ir.intent,
+            context=context,
+            model_provider=ir.model_hint or "anthropic",
+            token_budget=budget,
+        )
+
+        # Enrich compilation metadata with IR info
+        compiled.compilation_metadata["ir_id"] = ir.ir_id
+        compiled.compilation_metadata["ir_version"] = ir.ir_version
+        compiled.compilation_metadata["ir_phase"] = ir.phase.value
+        compiled.compilation_metadata["ir_priority"] = ir.priority
+        compiled.compilation_metadata["ir_constraints"] = ir.constraints
+
+        return compiled
+
+    def _resolve_context_refs(
+        self,
+        refs: List[str],
+        metadata: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Resolve IR context references to actual context data.
+
+        Handles:
+        - __CONTEXT_DIGEST__ -> use metadata digest (from ContextDigestPlugin)
+        - file:<path> -> read file content
+        - diff:<ref> -> get git diff
+        - memory:<key> -> retrieve from metadata
+        - raw strings -> pass through as filesystem context
+        """
+        context: Dict[str, Any] = {}
+
+        for ref in refs:
+            if ref == "__CONTEXT_DIGEST__":
+                # Use digest from ContextDigestPlugin
+                context["digest"] = metadata.get("context_digest", "")
+            elif ref.startswith("file:"):
+                filepath = ref[5:]
+                content = self._read_file(filepath)
+                if "filesystem" not in context:
+                    context["filesystem"] = {"key_files": {}}
+                context["filesystem"]["key_files"][filepath] = content
+            elif ref.startswith("diff:"):
+                diff_ref = ref[5:]
+                if "git" not in context:
+                    context["git"] = {}
+                context["git"]["diff_ref"] = diff_ref
+            elif ref.startswith("memory:"):
+                memory_key = ref[7:]
+                if "memory" not in context:
+                    context["memory"] = {}
+                context["memory"][memory_key] = metadata.get(memory_key, "")
+            else:
+                # Treat as raw file reference
+                if "filesystem" not in context:
+                    context["filesystem"] = {"key_files": {}}
+                context["filesystem"]["key_files"][ref] = f"[Reference: {ref}]"
+
+        return context
+
+    def _read_file(self, filepath: str) -> str:
+        """Read a file for context resolution. Returns content or placeholder."""
+        try:
+            path = Path(filepath)
+            if path.exists():
+                return path.read_text()[:10000]  # Cap at 10k chars
+        except Exception as e:
+            logger.warning("Could not read file %s: %s", filepath, e)
+        return f"[File not found: {filepath}]"
 
     def list_templates(self) -> List[str]:
         """List all loaded template role names."""

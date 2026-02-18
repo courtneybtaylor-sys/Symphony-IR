@@ -15,14 +15,19 @@
 │  └──────┬───────┘  └──────┬──────┘  └────────┬─────────┘  │
 │         │                 │                   │            │
 │  ┌──────┴───────┐  ┌──────┴──────┐  ┌────────┴─────────┐  │
-│  │  Prompt       │  │  Schema     │  │   Providers       │  │
-│  │  Compiler     │  │  Validator  │  │  FS / Git / File  │  │
+│  │  Prompt IR    │  │  Schema     │  │   Providers       │  │
+│  │  Pipeline     │  │  Validator  │  │  FS / Git / File  │  │
 │  └──────┬───────┘  └──────┬──────┘  └──────────────────┘  │
 │         │                 │                                │
-│  ┌──────┴───────┐  ┌──────┴──────┐                         │
-│  │  Governance   │  │   Model     │                         │
-│  │  (Ma'aT)      │  │   Factory   │                         │
-│  └──────────────┘  └──────┬──────┘                         │
+│  ┌──────┴───────┐  ┌──────┴──────┐  ┌──────────────────┐  │
+│  │  Prompt       │  │   Model     │  │  Efficiency      │  │
+│  │  Compiler     │  │   Factory   │  │  Stats (A/B)     │  │
+│  └──────┬───────┘  └──────┬──────┘  └──────────────────┘  │
+│         │                 │                                │
+│  ┌──────┴───────┐                                          │
+│  │  Governance   │                                          │
+│  │ (Ma'aT + IR) │                                          │
+│  └──────────────┘                                          │
 │                           │                                │
 │  ┌────────────────────────┴────────────────────────────┐   │
 │  │              Model Abstraction Layer                 │   │
@@ -224,6 +229,92 @@ declared schemas before synthesis.
 
 **Impact:** Reduces synthesis failures by 50%+ and retry loops by 67%.
 
+### 8. Prompt IR Pipeline (`core/prompt_ir.py`)
+
+The Prompt IR (Intermediate Representation) is the AST for prompts. It transforms
+the system from "string plumbing" into a real compiler pipeline with structured,
+inspectable IR between high-level intent and compiled prompts.
+
+**Key types:**
+
+- `PromptIR` — Structured representation: role, intent, phase, context_refs, constraints, token_budget, priority, model_hint, metadata
+- `PromptIRBuilder` — Fluent builder for clean IR construction
+- `PromptIRPlugin` — Base class for safe IR transformations
+- `ContextDigestPlugin` — Compresses large context sets into digests (15 files → 1 summary)
+- `BudgetOptimizerPlugin` — Phase/priority-aware budget adjustment (planning gets +20%, review gets -20%)
+- `IRGovernanceChecker` — Policy enforcement before token spend (protected paths, destructive actions, sensitive constraints)
+- `PromptIRPipeline` — Orchestrates governance check → plugin transforms → audit logging
+
+**Pipeline flow:**
+
+```
+PromptIRBuilder.build()
+    ↓
+PromptIR { role, intent, context_refs, constraints, budget }
+    ↓
+IRGovernanceChecker.check()  ← Free! No tokens spent
+    ├─ DENY → Block before compile  (saves 100% of rejected tokens)
+    └─ APPROVE → Continue
+    ↓
+ContextDigestPlugin.transform()  ← Compress if needed
+    ↓
+BudgetOptimizerPlugin.transform()  ← Adjust budget
+    ↓
+PromptCompiler.compile_from_ir()  ← Standard compilation
+    ↓
+CompiledPrompt
+```
+
+**Governance policies (default):**
+
+| Policy | Type | Action | Example |
+|--------|------|--------|---------|
+| Protected paths | context_ref | DENY | `/sys/`, `/etc/`, `C:\Windows\` |
+| Destructive actions | intent | FLAG | "delete all", "drop database", "rm -rf" |
+| Sensitive constraints | constraint | DENY | "ignore policy", "bypass", "override" |
+
+**Budget optimization multipliers:**
+
+| Phase | Multiplier | Rationale |
+|-------|------------|-----------|
+| Planning | 1.2x | Needs more exploration |
+| Research | 1.3x | Needs most context |
+| Implementation | 1.0x | Baseline |
+| Review | 0.8x | Can be concise |
+| Synthesis | 1.1x | Moderate needs |
+
+Priority bonus: `(priority - 5) * 0.1` (-0.4 to +0.5)
+
+### 9. A/B Efficiency Statistics (`core/efficiency_stats.py`)
+
+Quantifiable ROI measurement for the compiler pipeline.
+
+**Key types:**
+
+- `EfficiencyCalculator` — Computes cost, summarizes runs, compares A/B groups
+- `RunStats` — Aggregated statistics (avg tokens, duration, retries, repairs, cost)
+- `ABComparison` — Full comparison with improvement percentages and efficiency score
+- `RunLedgerParser` — Extracts standardized stats from run ledgers
+
+**Metrics tracked:**
+
+| Metric | Weight | Measurement |
+|--------|--------|-------------|
+| Token reduction | 30% | Input + output tokens |
+| Latency reduction | 20% | Execution duration |
+| Retry reduction | 20% | Failed retry count |
+| Cost reduction | 30% | USD based on model pricing |
+
+**Model pricing:** Built-in pricing tables for Claude (Opus/Sonnet/Haiku), GPT (4/4-turbo/3.5), with configurable defaults.
+
+**Statistical significance levels:**
+- < 20 samples: insufficient_data
+- 20-50 samples: low_confidence
+- 50-100 samples: moderate_confidence
+- 100+ samples: high_confidence
+
+**CLI:** `python orchestrator.py efficiency` generates an ROI report from saved run ledgers.
+
 ## Data Flow: Typical Execution
 
 ```
@@ -235,27 +326,35 @@ declared schemas before synthesis.
     Phase 2: Implementation (implementer)
     Phase 3: Review (reviewer, integrator)
 5.  Orchestrator transitions: PLAN → EXECUTE_PHASE
-6.  Prompt Compiler compiles prompts for architect + researcher:
+6.  For each agent, IR pipeline constructs + processes PromptIR:
+    a. PromptIRBuilder creates IR: role=architect, intent="Analyze: Design auth...",
+       context_refs=[file:README.md, file:requirements.txt, diff:main]
+    b. IRGovernanceChecker validates policies → APPROVED (no violations)
+    c. ContextDigestPlugin: 3 refs ≤ 10 limit → pass through
+    d. BudgetOptimizerPlugin: planning phase × priority 5 → 3000 × 1.2 × 1.0 = 3600
+7.  Prompt Compiler compiles from IR:
+    - compile_from_ir() resolves context refs to actual data
     - Template selection (architect template)
     - Context pruning (2 key files, git branch)
-    - Model adaptation (anthropic → XML wrapping)
-    - Token budget check (750 tokens, within 3000 limit)
+    - Model adaptation (mock → default)
+    - Token budget check (750 tokens, within 3600 adjusted limit)
     - Schema injection (JSON schema for system_design output)
-7.  Phase 1 agents execute in parallel with compiled prompts:
+8.  Phase 1 agents execute in parallel with compiled prompts:
     - Architect: system design → confidence 0.88
     - Researcher: prior art → confidence 0.92
-8.  Schema Validator checks outputs against declared schemas
-9.  EXECUTE_PHASE → SYNTHESIZE: Combine outputs
-10. SYNTHESIZE → VALIDATE: Check thresholds
+9.  Schema Validator checks outputs against declared schemas
+10. EXECUTE_PHASE → SYNTHESIZE: Combine outputs
+11. SYNTHESIZE → VALIDATE: Check thresholds
     avg_confidence = 0.90 >= 0.85 ✓
     critical_flags = [] ✓
     → Validation passes
-11. Repeat for Phase 2, Phase 3
-12. Compiler + validator stats recorded in ledger
-13. Governance checks final output
-14. VALIDATE → TERMINATE
-15. RunLedger saved to .orchestrator/runs/
-16. Compilation + validation logs saved to .orchestrator/logs/
+12. Repeat for Phase 2, Phase 3
+13. Compiler + validator + IR pipeline stats recorded in ledger
+14. Governance checks final output
+15. VALIDATE → TERMINATE
+16. RunLedger saved to .orchestrator/runs/
+17. Compilation + validation logs saved to .orchestrator/logs/
+18. Run `orchestrator efficiency` to measure A/B ROI across runs
 ```
 
 ## Extension Points
@@ -308,6 +407,37 @@ agents:
     model_provider: anthropic
     system_prompt: |
       You are the Security Auditor agent...
+```
+
+### Adding an IR Plugin
+
+```python
+from core.prompt_ir import PromptIRPlugin, PromptIR
+
+class SecurityScanPlugin(PromptIRPlugin):
+    """Scan for security anti-patterns in IR."""
+
+    def transform(self, ir: PromptIR) -> PromptIR:
+        ir_new = ir.clone()
+        if "password" in ir.intent.lower():
+            ir_new.constraints.append("Never log or display passwords")
+        self._record_transformation(ir, ir_new, "security", "Added password safety")
+        return ir_new
+```
+
+### Adding IR Governance Policies
+
+```python
+from core.prompt_ir import IRGovernanceChecker
+
+checker = IRGovernanceChecker(policies=[
+    {
+        "name": "budget_limit",
+        "type": "intent",
+        "forbidden_keywords": ["unlimited tokens"],
+        "action": "deny"
+    }
+])
 ```
 
 ### Adding Governance Rules

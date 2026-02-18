@@ -1,4 +1,4 @@
-"""Core orchestration engine, governance layer, prompt compiler, and schema validator."""
+"""Core orchestration engine, governance, prompt compiler, schema validator, IR pipeline, and efficiency stats."""
 
 from .orchestrator import (
     OrchestratorState,
@@ -25,6 +25,24 @@ from .schema_validator import (
     ValidationResult,
     ValidationReport,
 )
+from .prompt_ir import (
+    PhaseType,
+    PromptIR,
+    PromptIRBuilder,
+    PromptIRPlugin,
+    ContextDigestPlugin,
+    BudgetOptimizerPlugin,
+    IRGovernanceChecker,
+    PromptIRPipeline,
+    IRTransformation,
+)
+from .efficiency_stats import (
+    EfficiencyCalculator,
+    RunStats,
+    ABComparison,
+    RunLedgerParser,
+    MODEL_PRICING,
+)
 
 __all__ = [
     "OrchestratorState",
@@ -44,4 +62,18 @@ __all__ = [
     "SchemaValidator",
     "ValidationResult",
     "ValidationReport",
+    "PhaseType",
+    "PromptIR",
+    "PromptIRBuilder",
+    "PromptIRPlugin",
+    "ContextDigestPlugin",
+    "BudgetOptimizerPlugin",
+    "IRGovernanceChecker",
+    "PromptIRPipeline",
+    "IRTransformation",
+    "EfficiencyCalculator",
+    "RunStats",
+    "ABComparison",
+    "RunLedgerParser",
+    "MODEL_PRICING",
 ]
