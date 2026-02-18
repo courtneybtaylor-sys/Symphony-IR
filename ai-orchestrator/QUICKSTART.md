@@ -1,32 +1,44 @@
-# AI Orchestrator — Quick Start Guide
+# Symphony-IR — Quick Start Guide
 
 Get running in 5 minutes.
 
-## 1. Test Without API Keys
+## 1. Install
+
+```bash
+pip install symphony-ir
+```
+
+Or from source:
 
 ```bash
 cd ai-orchestrator
-pip install pyyaml
+pip install -e .
+```
+
+## 2. Test Without API Keys
+
+```bash
 python example.py
 ```
 
-This runs the full orchestration architecture with mock models. You'll see:
+This runs the full compiler-grade orchestration architecture with mock models. You'll see:
 - State machine execution
 - Multi-agent coordination (5 specialists)
+- Prompt IR pipeline (governance + plugin transforms)
 - Prompt compilation (token optimization + model adaptation)
 - Schema validation (output format enforcement)
-- Governance checks
+- A/B efficiency statistics
 - Complete audit trail
 
-## 2. Initialize Your Project
+## 3. Initialize Your Project
 
 ```bash
-python orchestrator.py init
+symphony init
 ```
 
-This creates `.orchestrator/` with:
+This creates `.symphony/` with:
 ```
-.orchestrator/
+.symphony/
 ├── agents.yaml      # Agent configurations
 ├── .env             # API key placeholders
 ├── .env.template    # Reference template
@@ -34,9 +46,9 @@ This creates `.orchestrator/` with:
 └── logs/            # Log files
 ```
 
-## 3. Add API Keys
+## 4. Add API Keys
 
-Edit `.orchestrator/.env`:
+Edit `.symphony/.env`:
 
 ```bash
 # Pick one (or multiple):
@@ -49,67 +61,92 @@ For **local-only** operation with Ollama:
 # Install Ollama: https://ollama.ai
 ollama pull llama3.2
 
-# Edit .orchestrator/agents.yaml — change model_provider to "ollama"
+# Edit .symphony/agents.yaml — change model_provider to "ollama"
 ```
 
-## 4. Run Your First Task
+## 5. Run Your First Task
 
 ```bash
-python orchestrator.py run "Design a REST API for user authentication"
+symphony run "Design a REST API for user authentication"
 ```
 
 With verbose output:
 ```bash
-python orchestrator.py run "Refactor the payment module" -v
+symphony run "Refactor the payment module" -v
 ```
 
 Dry run (see plan without executing):
 ```bash
-python orchestrator.py run "Add caching layer" --dry-run
+symphony run "Add caching layer" --dry-run
 ```
 
-Without prompt compilation (raw prompts only):
+Without IR pipeline (direct compilation only):
 ```bash
-python orchestrator.py run "Simple task" --no-compile
+symphony run "Simple task" --no-ir
 ```
 
-## 5. Common Commands
+Without any compilation (raw prompts):
+```bash
+symphony run "Simple task" --no-compile
+```
+
+## 6. Common Commands
 
 ```bash
 # Check what context is available
-python orchestrator.py status
+symphony status
 
 # View recent runs
-python orchestrator.py history
+symphony history
 
 # View detailed run history
-python orchestrator.py history --detailed --limit 5
+symphony history --detailed --limit 5
 
 # Include a specific file in context
-python orchestrator.py run "Review this code" --file src/main.py
+symphony run "Review this code" --file src/main.py
 
 # Point to a different project
-python orchestrator.py run "Analyze architecture" --project /path/to/project
+symphony run "Analyze architecture" --project /path/to/project
+
+# Generate A/B efficiency report
+symphony efficiency
+
+# Export efficiency report as JSON
+symphony efficiency --json --export report.json
+```
+
+## 7. Try the Workflow Examples
+
+```bash
+# Code refactoring workflow
+python examples/workflow_code_refactor.py
+
+# Multi-file analysis with context compression
+python examples/workflow_multifile_analysis.py
+
+# Research and synthesis pipeline
+python examples/workflow_research_synthesis.py
 ```
 
 ## Troubleshooting
 
 **"No agents.yaml found"**
-Run `python orchestrator.py init` first.
+Run `symphony init` first.
 
 **"openai package required"**
 Install the model provider you need:
 ```bash
-pip install openai        # For GPT models
-pip install anthropic     # For Claude models
-pip install requests      # For Ollama
+pip install symphony-ir[anthropic]   # For Claude models
+pip install symphony-ir[openai]      # For GPT models
+pip install symphony-ir[ollama]      # For Ollama
+pip install symphony-ir[all]         # Everything
 ```
 
 **"Connection refused" (Ollama)**
 Make sure Ollama is running: `ollama serve`
 
 **Mock mode keeps activating**
-Check that your API keys are set in `.orchestrator/.env` and the model_provider in agents.yaml matches your keys.
+Check that your API keys are set in `.symphony/.env` and the model_provider in agents.yaml matches your keys.
 
 **Low confidence scores**
 Adjust `confidence_threshold` in the `system:` section of agents.yaml (default: 0.85).

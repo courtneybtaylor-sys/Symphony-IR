@@ -1,40 +1,52 @@
-# AI Orchestrator — Technical Architecture
+# Symphony-IR — Technical Architecture
 
 ## System Overview
 
 ```
-┌────────────────────────────────────────────────────────────┐
-│                     CLI Interface                          │
-│                   (orchestrator.py)                         │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────────────┐  │
-│  │  Orchestrator │  │   Agent     │  │    Context        │  │
-│  │  State Machine│  │   Registry  │  │    Manager        │  │
-│  │  (core/)      │  │  (agents/)  │  │   (context/)      │  │
-│  └──────┬───────┘  └──────┬──────┘  └────────┬─────────┘  │
-│         │                 │                   │            │
-│  ┌──────┴───────┐  ┌──────┴──────┐  ┌────────┴─────────┐  │
-│  │  Prompt IR    │  │  Schema     │  │   Providers       │  │
-│  │  Pipeline     │  │  Validator  │  │  FS / Git / File  │  │
-│  └──────┬───────┘  └──────┬──────┘  └──────────────────┘  │
-│         │                 │                                │
-│  ┌──────┴───────┐  ┌──────┴──────┐  ┌──────────────────┐  │
-│  │  Prompt       │  │   Model     │  │  Efficiency      │  │
-│  │  Compiler     │  │   Factory   │  │  Stats (A/B)     │  │
-│  └──────┬───────┘  └──────┬──────┘  └──────────────────┘  │
-│         │                 │                                │
-│  ┌──────┴───────┐                                          │
-│  │  Governance   │                                          │
-│  │ (Ma'aT + IR) │                                          │
-│  └──────────────┘                                          │
-│                           │                                │
-│  ┌────────────────────────┴────────────────────────────┐   │
-│  │              Model Abstraction Layer                 │   │
-│  │   OpenAI  │  Anthropic  │  Ollama  │  Ma'aT  │ Mock │   │
-│  └─────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────┘
++------------------------------------------------------------+
+|                      CLI Interface                          |
+|                    (symphony / orchestrator.py)              |
++------------------------------------------------------------+
+|                                                             |
+|  +--------------+  +-------------+  +------------------+   |
+|  |  Orchestrator |  |   Agent     |  |    Context        |  |
+|  |  State Machine|  |   Registry  |  |    Manager        |  |
+|  |  (core/)      |  |  (agents/)  |  |   (context/)      |  |
+|  +------+-------+  +------+------+  +--------+---------+   |
+|         |                 |                   |             |
+|  +------+-------+  +------+------+  +--------+---------+   |
+|  |  Prompt IR    |  |  Schema     |  |   Providers       |  |
+|  |  Pipeline     |  |  Validator  |  |  FS / Git / File  |  |
+|  +------+-------+  +------+------+  +------------------+   |
+|         |                 |                                 |
+|  +------+-------+  +------+------+  +------------------+   |
+|  |  Prompt       |  |   Model     |  |  Efficiency      |  |
+|  |  Compiler     |  |   Factory   |  |  Stats (A/B)     |  |
+|  +------+-------+  +------+------+  +------------------+   |
+|         |                 |                                 |
+|  +------+-------+                                           |
+|  |  Governance   |                                           |
+|  | (Ma'aT + IR) |                                           |
+|  +--------------+                                           |
+|                           |                                 |
+|  +-----------------------------------------------------+   |
+|  |              Model Abstraction Layer                  |  |
+|  |   OpenAI  |  Anthropic  |  Ollama  |  Ma'aT  | Mock  |  |
+|  +-----------------------------------------------------+   |
++------------------------------------------------------------+
 ```
+
+## IR Schema Version
+
+Symphony-IR uses a **frozen IR schema** (currently v1.0) with stability guarantees:
+
+- All PromptIR fields in v1.0 remain present in future 1.x releases
+- New optional fields may be added (with defaults) in minor releases
+- Serialization format (`to_dict`/`from_dict`) is stable and backwards-compatible
+- Plugin `transform()` signature is stable: `(PromptIR) -> PromptIR`
+- Pipeline `process()` signature is stable: `(PromptIR) -> (PromptIR, bool, List[str])`
+
+See `IR_SPEC.md` for the full schema specification.
 
 ## Core Components
 
@@ -183,14 +195,14 @@ model-optimized, token-efficient instruction packets.
 **Compilation pipeline:**
 
 ```
-Template Selection → Context Pruning → Model Adaptation → Token Budget → Schema Injection
+Template Selection -> Context Pruning -> Model Adaptation -> Token Budget -> Schema Injection
 ```
 
 | Step | Purpose | Savings |
 |------|---------|---------|
 | Template selection | Match role to YAML template with goal + constraints | - |
 | Context pruning | Remove irrelevant files, truncate large content | 30-50% |
-| Model adaptation | Claude→XML, GPT→JSON schema, Ollama→instruction tags | 5-10% |
+| Model adaptation | Claude->XML, GPT->JSON schema, Ollama->instruction tags | 5-10% |
 | Token budget | Hard limits prevent runaway prompt sizes | variable |
 | Schema injection | Append output format requirements | -5% (adds schema) |
 
@@ -218,8 +230,8 @@ declared schemas before synthesis.
 5. Log result to audit trail
 
 **Auto-repair capabilities:**
-- Extract JSON from markdown code blocks (` ```json ... ``` `)
-- Fix single quotes → double quotes
+- Extract JSON from markdown code blocks
+- Fix single quotes to double quotes
 - Remove trailing commas
 - Balance unmatched braces/brackets
 
@@ -240,28 +252,28 @@ inspectable IR between high-level intent and compiled prompts.
 - `PromptIR` — Structured representation: role, intent, phase, context_refs, constraints, token_budget, priority, model_hint, metadata
 - `PromptIRBuilder` — Fluent builder for clean IR construction
 - `PromptIRPlugin` — Base class for safe IR transformations
-- `ContextDigestPlugin` — Compresses large context sets into digests (15 files → 1 summary)
+- `ContextDigestPlugin` — Compresses large context sets into digests (15 files to 1 summary)
 - `BudgetOptimizerPlugin` — Phase/priority-aware budget adjustment (planning gets +20%, review gets -20%)
 - `IRGovernanceChecker` — Policy enforcement before token spend (protected paths, destructive actions, sensitive constraints)
-- `PromptIRPipeline` — Orchestrates governance check → plugin transforms → audit logging
+- `PromptIRPipeline` — Orchestrates governance check, plugin transforms, and audit logging
 
 **Pipeline flow:**
 
 ```
 PromptIRBuilder.build()
-    ↓
+    |
 PromptIR { role, intent, context_refs, constraints, budget }
-    ↓
-IRGovernanceChecker.check()  ← Free! No tokens spent
-    ├─ DENY → Block before compile  (saves 100% of rejected tokens)
-    └─ APPROVE → Continue
-    ↓
-ContextDigestPlugin.transform()  ← Compress if needed
-    ↓
-BudgetOptimizerPlugin.transform()  ← Adjust budget
-    ↓
-PromptCompiler.compile_from_ir()  ← Standard compilation
-    ↓
+    |
+IRGovernanceChecker.check()  <- Free! No tokens spent
+    |- DENY -> Block before compile  (saves 100% of rejected tokens)
+    +- APPROVE -> Continue
+    |
+ContextDigestPlugin.transform()  <- Compress if needed
+    |
+BudgetOptimizerPlugin.transform()  <- Adjust budget
+    |
+PromptCompiler.compile_from_ir()  <- Standard compilation
+    |
 CompiledPrompt
 ```
 
@@ -284,6 +296,8 @@ CompiledPrompt
 | Synthesis | 1.1x | Moderate needs |
 
 Priority bonus: `(priority - 5) * 0.1` (-0.4 to +0.5)
+
+See `PLUGIN_GUIDE.md` for writing custom IR plugins.
 
 ### 9. A/B Efficiency Statistics (`core/efficiency_stats.py`)
 
@@ -313,48 +327,48 @@ Quantifiable ROI measurement for the compiler pipeline.
 - 50-100 samples: moderate_confidence
 - 100+ samples: high_confidence
 
-**CLI:** `python orchestrator.py efficiency` generates an ROI report from saved run ledgers.
+**CLI:** `symphony efficiency` generates an ROI report from saved run ledgers.
 
 ## Data Flow: Typical Execution
 
 ```
-1.  CLI receives task → "Design auth system"
+1.  CLI receives task: "Design auth system"
 2.  ContextManager collects filesystem + git data
-3.  Orchestrator transitions: INIT → PLAN
+3.  Orchestrator transitions: INIT -> PLAN
 4.  Conductor agent creates phase plan:
     Phase 1: Analysis (architect, researcher)
     Phase 2: Implementation (implementer)
     Phase 3: Review (reviewer, integrator)
-5.  Orchestrator transitions: PLAN → EXECUTE_PHASE
+5.  Orchestrator transitions: PLAN -> EXECUTE_PHASE
 6.  For each agent, IR pipeline constructs + processes PromptIR:
     a. PromptIRBuilder creates IR: role=architect, intent="Analyze: Design auth...",
        context_refs=[file:README.md, file:requirements.txt, diff:main]
-    b. IRGovernanceChecker validates policies → APPROVED (no violations)
-    c. ContextDigestPlugin: 3 refs ≤ 10 limit → pass through
-    d. BudgetOptimizerPlugin: planning phase × priority 5 → 3000 × 1.2 × 1.0 = 3600
+    b. IRGovernanceChecker validates policies -> APPROVED (no violations)
+    c. ContextDigestPlugin: 3 refs <= 10 limit -> pass through
+    d. BudgetOptimizerPlugin: planning phase x priority 5 -> 3000 x 1.2 x 1.0 = 3600
 7.  Prompt Compiler compiles from IR:
     - compile_from_ir() resolves context refs to actual data
     - Template selection (architect template)
     - Context pruning (2 key files, git branch)
-    - Model adaptation (mock → default)
+    - Model adaptation (mock -> default)
     - Token budget check (750 tokens, within 3600 adjusted limit)
     - Schema injection (JSON schema for system_design output)
 8.  Phase 1 agents execute in parallel with compiled prompts:
-    - Architect: system design → confidence 0.88
-    - Researcher: prior art → confidence 0.92
+    - Architect: system design -> confidence 0.88
+    - Researcher: prior art -> confidence 0.92
 9.  Schema Validator checks outputs against declared schemas
-10. EXECUTE_PHASE → SYNTHESIZE: Combine outputs
-11. SYNTHESIZE → VALIDATE: Check thresholds
-    avg_confidence = 0.90 >= 0.85 ✓
-    critical_flags = [] ✓
-    → Validation passes
+10. EXECUTE_PHASE -> SYNTHESIZE: Combine outputs
+11. SYNTHESIZE -> VALIDATE: Check thresholds
+    avg_confidence = 0.90 >= 0.85
+    critical_flags = []
+    -> Validation passes
 12. Repeat for Phase 2, Phase 3
 13. Compiler + validator + IR pipeline stats recorded in ledger
 14. Governance checks final output
-15. VALIDATE → TERMINATE
-16. RunLedger saved to .orchestrator/runs/
-17. Compilation + validation logs saved to .orchestrator/logs/
-18. Run `orchestrator efficiency` to measure A/B ROI across runs
+15. VALIDATE -> TERMINATE
+16. RunLedger saved to .symphony/runs/
+17. Compilation + validation logs saved to .symphony/logs/
+18. Run `symphony efficiency` to measure A/B ROI across runs
 ```
 
 ## Extension Points
@@ -398,7 +412,7 @@ class DockerContext(ContextProvider):
 
 ### Adding a New Agent
 
-Add to `agents.yaml`:
+Add to `.symphony/agents.yaml`:
 
 ```yaml
 agents:
@@ -424,6 +438,8 @@ class SecurityScanPlugin(PromptIRPlugin):
         self._record_transformation(ir, ir_new, "security", "Added password safety")
         return ir_new
 ```
+
+See `PLUGIN_GUIDE.md` for the full plugin development guide.
 
 ### Adding IR Governance Policies
 
@@ -460,7 +476,7 @@ Extend `MaaTGovernanceEngine`:
 - `${VAR_NAME}` substitution resolves from environment at runtime
 - Governance engine blocks known dangerous patterns
 - Secret detection prevents credential exposure in outputs
-- `.orchestrator/.env` should be in `.gitignore`
+- `.symphony/.env` should be in `.gitignore`
 - Trust-based authorization for high-risk actions
 
 ## Future Architecture

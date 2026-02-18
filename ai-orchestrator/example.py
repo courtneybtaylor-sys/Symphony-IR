@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""AI Orchestrator Demo - Runs without API keys using mock models.
+"""Symphony-IR Demo — Runs without API keys using mock models.
 
-This demonstrates the full orchestration architecture:
+This demonstrates the full compiler-grade orchestration architecture:
 - State machine execution
 - Multi-agent coordination
 - Prompt IR (Intermediate Representation) pipeline
@@ -26,6 +26,7 @@ from core.governance import MaaTGovernanceEngine, GovernanceDecision
 from core.prompt_compiler import PromptCompiler
 from core.schema_validator import SchemaValidator
 from core.prompt_ir import (
+    IR_SCHEMA_VERSION,
     PhaseType,
     PromptIR,
     PromptIRBuilder,
@@ -122,7 +123,7 @@ def create_mock_agents():
 def demo_ir_standalone():
     """Demonstrate Prompt IR as a standalone component."""
     print("=" * 70)
-    print("  PROMPT IR DEMO - Standalone")
+    print("  PROMPT IR DEMO — Standalone (Schema v{})".format(IR_SCHEMA_VERSION))
     print("=" * 70)
     print()
 
@@ -148,6 +149,7 @@ def demo_ir_standalone():
     print(f"  Constraints: {ir.constraints}")
     print(f"  Budget:      {ir.token_budget}")
     print(f"  Priority:    {ir.priority}")
+    print(f"  IR Version:  {ir.ir_version}")
     print()
 
     # 2. Demonstrate IR governance
@@ -273,9 +275,9 @@ def demo_efficiency_stats():
 
 def main():
     print("=" * 70)
-    print("  AI ORCHESTRATOR - Full Architecture Demo")
-    print("  Deterministic Multi-Agent Coordination Engine")
-    print("  with Prompt IR Pipeline + A/B Efficiency Stats")
+    print("  SYMPHONY-IR — Full Architecture Demo")
+    print("  Compiler-Grade Runtime for Multi-Model AI Orchestration")
+    print("  IR Schema v{}".format(IR_SCHEMA_VERSION))
     print("=" * 70)
     print()
 
@@ -324,7 +326,7 @@ def main():
     print()
 
     # Step 6: Set up IR pipeline
-    print("[6/9] Initializing IR pipeline...")
+    print("[6/9] Initializing IR pipeline (v{})...".format(IR_SCHEMA_VERSION))
     ir_pipeline = PromptIRPipeline(
         plugins=[
             ContextDigestPlugin(config={"max_context_refs": 10}),
@@ -432,7 +434,7 @@ def main():
 
     # IR pipeline stats
     ir_stats = ir_pipeline.get_pipeline_stats()
-    print("IR Pipeline Stats:")
+    print("IR Pipeline Stats (v{}):".format(IR_SCHEMA_VERSION))
     print("-" * 70)
     print(f"  Pipeline runs:      {ir_stats['total_runs']}")
     print(f"  Transformations:    {ir_stats['total_transformations']}")
@@ -466,6 +468,7 @@ def main():
     print("  [x] Conductor + Specialist pattern (5 specialist agents)")
     print("  [x] Structured output parsing (OUTPUT/CONFIDENCE/RISK_FLAGS/REASONING)")
     print("  [x] Prompt IR pipeline (PromptIR -> Governance -> Plugins -> CompiledPrompt)")
+    print("  [x] IR schema v{} frozen with stability guarantees".format(IR_SCHEMA_VERSION))
     print("  [x] IR governance (policy-based intent inspection before token spend)")
     print("  [x] IR plugins (ContextDigestPlugin, BudgetOptimizerPlugin)")
     print("  [x] Prompt compiler (template selection, context pruning, model adaptation, token budgets)")
@@ -488,17 +491,17 @@ def main():
     # Next steps
     print("Next Steps:")
     print("-" * 70)
-    print("  1. Run 'python orchestrator.py init' to set up your project")
-    print("  2. Add API keys to .orchestrator/.env")
-    print("  3. Customize agents in .orchestrator/agents.yaml")
+    print("  1. Run 'symphony init' to set up your project")
+    print("  2. Add API keys to .symphony/.env")
+    print("  3. Customize agents in .symphony/agents.yaml")
     print("  4. Customize prompt templates in config/prompt_templates.yaml")
-    print('  5. Run: python orchestrator.py run "your task here"')
-    print('  6. Run: python orchestrator.py run --no-ir "task" (skip IR pipeline)')
-    print('  7. Run: python orchestrator.py efficiency (A/B report)')
+    print('  5. Run: symphony run "your task here"')
+    print('  6. Run: symphony run --no-ir "task" (skip IR pipeline)')
+    print('  7. Run: symphony efficiency (A/B report)')
     print()
     print("  Swap models by changing model_provider in agents.yaml:")
-    print("    anthropic -> OpenAI/GPT")
-    print("    openai    -> Anthropic/Claude")
+    print("    anthropic -> Anthropic/Claude")
+    print("    openai    -> OpenAI/GPT")
     print("    ollama    -> Local models (Llama, Mistral, etc.)")
     print("    mock      -> Testing without API keys")
     print()
