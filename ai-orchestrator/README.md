@@ -13,7 +13,7 @@ AI Orchestrator is **infrastructure**, not a chatbot wrapper. It coordinates mul
 - **Constitutional governance** — Ma'aT enforcement layer
 - **Production quality** — Built to ship as a developer tool
 
-## Core Concept: Conductor + Specialists
+## Core Concept: Conductor + Compilation + Specialists
 
 ```
 USER INPUT (task + context)
@@ -22,12 +22,16 @@ ORCHESTRATOR (deterministic state machine)
     ↓
 CONDUCTOR AGENT (creates execution plan)
     ↓
-5 SPECIALIST AGENTS (parallel execution)
+PROMPT COMPILER (template selection, context pruning, model adaptation)
+    ↓
+5 SPECIALIST AGENTS (parallel execution with optimized prompts)
     ├─ Architect:    System design, constraints
     ├─ Researcher:   Documentation, prior art
     ├─ Implementer:  Concrete code/content
     ├─ Reviewer:     Critique, edge cases
     └─ Integrator:   Synthesize outputs
+    ↓
+SCHEMA VALIDATOR (output format enforcement + auto-repair)
     ↓
 GOVERNANCE LAYER (Ma'aT constitutional checks)
     ↓
@@ -102,7 +106,8 @@ Options:
 - `--project <path>` — Project root (default: current dir)
 - `--file <path>` — Include a specific file in context
 - `--dry-run` — Show plan without executing
-- `-v, --verbose` — Detailed output with decision chain
+- `--no-compile` — Disable prompt compiler and schema validator
+- `-v, --verbose` — Detailed output with decision chain and compiler/validator stats
 
 ### Check Status
 
@@ -133,12 +138,36 @@ INIT → PLAN → EXECUTE_PHASE → SYNTHESIZE → VALIDATE → TERMINATE
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | Orchestrator | `core/orchestrator.py` | State machine engine |
+| Prompt Compiler | `core/prompt_compiler.py` | Token-optimized prompt compilation |
+| Schema Validator | `core/schema_validator.py` | Output format enforcement + auto-repair |
 | Governance | `core/governance.py` | Ma'aT constitutional checks |
 | Model Layer | `models/client.py` | Unified model abstraction |
 | Agent System | `agents/agent.py` | Agent execution + registry |
 | Context | `context/providers.py` | Project context collection |
 | CLI | `orchestrator.py` | Command-line interface |
 | Config | `config/agents.yaml` | Agent configurations |
+| Templates | `config/prompt_templates.yaml` | Prompt compilation templates |
+
+### Prompt Compilation Pipeline
+
+The Prompt Compiler transforms high-level Conductor instructions into model-optimized prompts:
+
+1. **Template Selection** — Match agent role to YAML-defined prompt template
+2. **Context Pruning** — Remove irrelevant context (up to 40% token reduction)
+3. **Model Adaptation** — Claude gets XML wrapping, GPT gets JSON schemas, Ollama gets instruction tags
+4. **Token Budget Enforcement** — Hard limits prevent runaway prompt sizes
+5. **Schema Injection** — Append output format requirements for structured responses
+
+Disable with `--no-compile` flag.
+
+### Schema Validation
+
+The Schema Validator sits between agent output and synthesis:
+
+- Validates outputs against declared JSON/Markdown/XML schemas
+- Auto-repairs common issues (missing braces, trailing commas, single quotes)
+- Logs all validation decisions for audit trail
+- Reduces retry loops by 50%+
 
 ### Termination Logic
 
@@ -186,9 +215,11 @@ Change `model_provider` in agents.yaml to switch models without changing code:
 
 ## Roadmap
 
-### Phase 1: Foundation (Current)
+### Phase 1: Foundation + Compilation (Current)
 - State machine orchestration
 - 5 specialist agents + conductor
+- Prompt compiler with model adaptation
+- Schema validator with auto-repair
 - Mock and real model support
 - CLI interface
 

@@ -141,6 +141,9 @@ class Orchestrator:
         agent_executor: Optional[Callable] = None,
         conductor_executor: Optional[Callable] = None,
         governance_checker: Optional[Callable] = None,
+        prompt_compiler: Optional[Any] = None,
+        schema_validator: Optional[Any] = None,
+        agent_provider_resolver: Optional[Callable] = None,
     ):
         """Initialize the orchestrator.
 
@@ -149,6 +152,9 @@ class Orchestrator:
             agent_executor: Callable(agent_name, phase_brief, context) -> AgentResponse
             conductor_executor: Callable(task, context) -> List[Phase]
             governance_checker: Callable(action_type, details, context) -> GovernanceResult
+            prompt_compiler: Optional PromptCompiler for token-optimized prompts
+            schema_validator: Optional SchemaValidator for output format enforcement
+            agent_provider_resolver: Callable(agent_name) -> str (model provider name)
         """
         config = config or {}
         self.max_phases = config.get("max_phases", 10)
@@ -159,6 +165,9 @@ class Orchestrator:
         self._agent_executor = agent_executor
         self._conductor_executor = conductor_executor
         self._governance_checker = governance_checker
+        self._prompt_compiler = prompt_compiler
+        self._schema_validator = schema_validator
+        self._agent_provider_resolver = agent_provider_resolver
 
         self._state = OrchestratorState.INIT
         self._ledger: Optional[RunLedger] = None
@@ -258,6 +267,27 @@ class Orchestrator:
                     f"Decision: {gov_result.decision.value if hasattr(gov_result, 'decision') else gov_result}",
                 )
 
+            # Record compiler/validator stats if available
+            if self._prompt_compiler:
+                stats = self._prompt_compiler.get_compilation_stats()
+                self._record_decision(
+                    "Prompt compiler stats",
+                    f"compilations={stats.get('total_compilations', 0)}, "
+                    f"avg_tokens={stats.get('average_tokens_per_prompt', 0)}, "
+                    f"compression_rate={stats.get('compression_rate', 0)}",
+                    stats,
+                )
+
+            if self._schema_validator:
+                stats = self._schema_validator.get_validation_stats()
+                self._record_decision(
+                    "Schema validator stats",
+                    f"validations={stats.get('total_validations', 0)}, "
+                    f"success_rate={stats.get('success_rate', 0)}, "
+                    f"repair_rate={stats.get('repair_rate', 0)}",
+                    stats,
+                )
+
             # TERMINATE
             self._transition(OrchestratorState.TERMINATE)
             self._ledger.state = OrchestratorState.TERMINATE.value
@@ -301,41 +331,124 @@ class Orchestrator:
     def _execute_phase(
         self, phase: Phase, context: Dict
     ) -> List[AgentResponse]:
-        """Execute all agents in a phase, optionally in parallel."""
+        """Execute all agents in a phase, optionally in parallel.
+
+        When a PromptCompiler is configured, prompts are compiled before dispatch.
+        When a SchemaValidator is configured, outputs are validated after execution.
+        """
         responses = []
 
         if not self._agent_executor:
             logger.warning("No agent executor set, returning empty responses")
             return responses
 
+        # Compile prompts if compiler is available
+        compiled_briefs = {}
+        if self._prompt_compiler:
+            for agent_name in phase.agents:
+                try:
+                    provider = "mock"
+                    if self._agent_provider_resolver:
+                        provider = self._agent_provider_resolver(agent_name)
+                    if self._prompt_compiler.has_template(agent_name):
+                        compiled = self._prompt_compiler.compile(
+                            role=agent_name,
+                            phase_brief=phase.brief,
+                            context=context,
+                            model_provider=provider,
+                        )
+                        compiled_briefs[agent_name] = compiled
+                        self._record_decision(
+                            f"Prompt compiled for {agent_name}",
+                            f"tokens={compiled.estimated_tokens}, "
+                            f"adapter={compiled.compilation_metadata.get('model_adapter')}",
+                            compiled.compilation_metadata,
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Prompt compilation failed for %s: %s, using raw brief",
+                        agent_name,
+                        e,
+                    )
+
+        def _run_agent(agent_name: str) -> AgentResponse:
+            """Execute a single agent with optional compiled prompt."""
+            # Use compiled prompt content if available, otherwise raw brief
+            brief = phase.brief
+            if agent_name in compiled_briefs:
+                brief = compiled_briefs[agent_name].content
+
+            result = self._agent_executor(
+                agent_name,
+                brief,
+                {**context, "phase": phase.name},
+            )
+
+            if isinstance(result, AgentResponse):
+                response = result
+            elif isinstance(result, dict):
+                response = AgentResponse(
+                    agent_name=result.get("agent_name", agent_name),
+                    role=result.get("role", "unknown"),
+                    output=result.get("output", ""),
+                    confidence=result.get("confidence", 0.0),
+                    risk_flags=result.get("risk_flags", []),
+                    metadata=result.get("metadata", {}),
+                )
+            else:
+                response = AgentResponse(
+                    agent_name=agent_name,
+                    role="unknown",
+                    output=str(result),
+                    confidence=0.0,
+                    risk_flags=[],
+                )
+
+            # Validate output if validator and compiled schema are available
+            if self._schema_validator and agent_name in compiled_briefs:
+                compiled = compiled_briefs[agent_name]
+                schema = compiled.output_schema
+                try:
+                    validation = self._schema_validator.validate(
+                        output=response.output,
+                        schema=schema.schema_definition,
+                        format_type=schema.format_type.value,
+                        role=agent_name,
+                    )
+                    if validation.is_valid():
+                        if validation.repaired_output and validation.warnings:
+                            response.metadata["schema_repaired"] = True
+                            response.metadata["repair_warnings"] = validation.warnings
+                    else:
+                        response.metadata["schema_validation_errors"] = validation.errors
+                        self._record_decision(
+                            f"Schema validation failed for {agent_name}",
+                            f"errors={validation.errors}",
+                        )
+                except Exception as e:
+                    logger.warning(
+                        "Schema validation failed for %s: %s", agent_name, e
+                    )
+
+            # Record compilation metadata on response
+            if agent_name in compiled_briefs:
+                response.metadata["compiled"] = True
+                response.metadata["estimated_tokens"] = (
+                    compiled_briefs[agent_name].estimated_tokens
+                )
+
+            return response
+
         if self.enable_parallel and len(phase.agents) > 1:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = {
-                    executor.submit(
-                        self._agent_executor,
-                        agent_name,
-                        phase.brief,
-                        {**context, "phase": phase.name},
-                    ): agent_name
+                    executor.submit(_run_agent, agent_name): agent_name
                     for agent_name in phase.agents
                 }
                 for future in as_completed(futures):
                     agent_name = futures[future]
                     try:
-                        result = future.result()
-                        if isinstance(result, AgentResponse):
-                            responses.append(result)
-                        elif isinstance(result, dict):
-                            responses.append(
-                                AgentResponse(
-                                    agent_name=result.get("agent_name", agent_name),
-                                    role=result.get("role", "unknown"),
-                                    output=result.get("output", ""),
-                                    confidence=result.get("confidence", 0.0),
-                                    risk_flags=result.get("risk_flags", []),
-                                    metadata=result.get("metadata", {}),
-                                )
-                            )
+                        responses.append(future.result())
                     except Exception as e:
                         logger.error(f"Agent {agent_name} failed: {e}")
                         responses.append(
@@ -350,24 +463,7 @@ class Orchestrator:
         else:
             for agent_name in phase.agents:
                 try:
-                    result = self._agent_executor(
-                        agent_name,
-                        phase.brief,
-                        {**context, "phase": phase.name},
-                    )
-                    if isinstance(result, AgentResponse):
-                        responses.append(result)
-                    elif isinstance(result, dict):
-                        responses.append(
-                            AgentResponse(
-                                agent_name=result.get("agent_name", agent_name),
-                                role=result.get("role", "unknown"),
-                                output=result.get("output", ""),
-                                confidence=result.get("confidence", 0.0),
-                                risk_flags=result.get("risk_flags", []),
-                                metadata=result.get("metadata", {}),
-                            )
-                        )
+                    responses.append(_run_agent(agent_name))
                 except Exception as e:
                     logger.error(f"Agent {agent_name} failed: {e}")
                     responses.append(

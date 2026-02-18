@@ -1,4 +1,4 @@
-"""Core orchestration engine and governance layer."""
+"""Core orchestration engine, governance layer, prompt compiler, and schema validator."""
 
 from .orchestrator import (
     OrchestratorState,
@@ -12,6 +12,19 @@ from .governance import (
     GovernanceResult,
     MaaTGovernanceEngine,
 )
+from .prompt_compiler import (
+    PromptCompiler,
+    PromptFormat,
+    PromptTemplate,
+    CompiledPrompt,
+    OutputSchema,
+    TokenBudget,
+)
+from .schema_validator import (
+    SchemaValidator,
+    ValidationResult,
+    ValidationReport,
+)
 
 __all__ = [
     "OrchestratorState",
@@ -22,4 +35,13 @@ __all__ = [
     "GovernanceDecision",
     "GovernanceResult",
     "MaaTGovernanceEngine",
+    "PromptCompiler",
+    "PromptFormat",
+    "PromptTemplate",
+    "CompiledPrompt",
+    "OutputSchema",
+    "TokenBudget",
+    "SchemaValidator",
+    "ValidationResult",
+    "ValidationReport",
 ]

@@ -13,6 +13,8 @@ python example.py
 This runs the full orchestration architecture with mock models. You'll see:
 - State machine execution
 - Multi-agent coordination (5 specialists)
+- Prompt compilation (token optimization + model adaptation)
+- Schema validation (output format enforcement)
 - Governance checks
 - Complete audit trail
 
@@ -64,6 +66,11 @@ python orchestrator.py run "Refactor the payment module" -v
 Dry run (see plan without executing):
 ```bash
 python orchestrator.py run "Add caching layer" --dry-run
+```
+
+Without prompt compilation (raw prompts only):
+```bash
+python orchestrator.py run "Simple task" --no-compile
 ```
 
 ## 5. Common Commands

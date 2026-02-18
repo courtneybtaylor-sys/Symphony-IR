@@ -23,6 +23,8 @@ if str(PACKAGE_DIR) not in sys.path:
 
 from core.orchestrator import Orchestrator, AgentResponse, OrchestratorState
 from core.governance import MaaTGovernanceEngine
+from core.prompt_compiler import PromptCompiler
+from core.schema_validator import SchemaValidator
 from models.client import ModelFactory, MockModelClient
 from agents.agent import Agent, AgentConfig, AgentRegistry
 from context.providers import (
@@ -290,6 +292,24 @@ def cmd_run(args):
         if raw and "system" in raw:
             system_config.update(raw["system"])
 
+    # Set up prompt compiler
+    compiler = None
+    validator = None
+    if not args.no_compile:
+        templates_path = orch_dir if (orch_dir / "prompt_templates.yaml").exists() else PACKAGE_DIR / "config"
+        try:
+            compiler_config = system_config.get("prompt_compiler", {})
+            compiler = PromptCompiler(
+                templates_path=str(templates_path),
+                config=compiler_config if compiler_config else None,
+            )
+            print(f"  Prompt compiler: {len(compiler.list_templates())} templates loaded")
+        except Exception as e:
+            logger.warning(f"Could not initialize prompt compiler: {e}")
+
+        validator = SchemaValidator(config=system_config.get("schema_validator"))
+        print(f"  Schema validator: enabled (auto_repair={validator.config.get('auto_repair', True)})")
+
     # Create agent executor
     def agent_executor(agent_name, phase_brief, ctx):
         if registry.has_agent(agent_name):
@@ -305,11 +325,20 @@ def cmd_run(args):
                 "reasoning": "Agent not registered",
             }
 
+    # Agent provider resolver for prompt compiler
+    def agent_provider_resolver(agent_name):
+        if registry.has_agent(agent_name):
+            return registry.get_agent(agent_name).config.model_provider
+        return "mock"
+
     # Create orchestrator
     orchestrator = Orchestrator(
         config=system_config,
         agent_executor=agent_executor,
         governance_checker=lambda at, ad, ctx: governance.evaluate_action(at, ad, ctx),
+        prompt_compiler=compiler,
+        schema_validator=validator,
+        agent_provider_resolver=agent_provider_resolver,
     )
 
     if args.dry_run:
@@ -317,6 +346,8 @@ def cmd_run(args):
         print(f"Task: {task}")
         print(f"Agents: {registry.list_agents()}")
         print(f"Context providers: {context_manager.get_summary()}")
+        print(f"Prompt compiler: {'enabled (' + str(len(compiler.list_templates())) + ' templates)' if compiler else 'disabled'}")
+        print(f"Schema validator: {'enabled' if validator else 'disabled'}")
         print(f"Config: {system_config}")
         print("--- END DRY RUN ---")
         return 0
@@ -349,6 +380,28 @@ def cmd_run(args):
         print("\nDecision Chain:")
         for d in ledger.decisions:
             print(f"  [{d.state}] {d.action}: {d.reason}")
+
+        if compiler:
+            stats = compiler.get_compilation_stats()
+            print(f"\nPrompt Compiler Stats:")
+            print(f"  Compilations:   {stats.get('total_compilations', 0)}")
+            print(f"  Avg tokens:     {stats.get('average_tokens_per_prompt', 0)}")
+            print(f"  Compression:    {stats.get('compression_rate', 0):.1%}")
+
+        if validator:
+            stats = validator.get_validation_stats()
+            print(f"\nSchema Validator Stats:")
+            print(f"  Validations:    {stats.get('total_validations', 0)}")
+            print(f"  Success rate:   {stats.get('success_rate', 0):.1%}")
+            print(f"  Repair rate:    {stats.get('repair_rate', 0):.1%}")
+
+    # Export compiler/validator logs
+    logs_dir = orch_dir / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    if compiler:
+        compiler.export_log(str(logs_dir / f"compilation_{timestamp}_{ledger.run_id}.json"))
+    if validator:
+        validator.export_log(str(logs_dir / f"validation_{timestamp}_{ledger.run_id}.json"))
 
     return 0
 
@@ -493,6 +546,10 @@ def main():
     )
     run_parser.add_argument(
         "-v", "--verbose", action="store_true", help="Detailed output"
+    )
+    run_parser.add_argument(
+        "--no-compile", action="store_true",
+        help="Disable prompt compiler and schema validator",
     )
 
     # status

@@ -4,6 +4,8 @@
 This demonstrates the full orchestration architecture:
 - State machine execution
 - Multi-agent coordination
+- Prompt compilation (token optimization + model adaptation)
+- Schema validation (output format enforcement)
 - Governance checks
 - Audit trail generation
 """
@@ -19,6 +21,8 @@ if str(PACKAGE_DIR) not in sys.path:
 
 from core.orchestrator import Orchestrator, Phase, AgentResponse
 from core.governance import MaaTGovernanceEngine, GovernanceDecision
+from core.prompt_compiler import PromptCompiler
+from core.schema_validator import SchemaValidator
 from models.client import MockModelClient, ModelFactory
 from agents.agent import Agent, AgentConfig, AgentRegistry
 
@@ -111,29 +115,42 @@ def main():
     print()
 
     # Step 1: Create mock context
-    print("[1/5] Creating mock project context...")
+    print("[1/7] Creating mock project context...")
     context = create_mock_context()
     print(f"  - Filesystem context: {context['filesystem']['root']}")
     print(f"  - Git branch: {context['git']['branch']}")
     print()
 
     # Step 2: Set up agents
-    print("[2/5] Initializing agent registry...")
+    print("[2/7] Initializing agent registry...")
     registry = create_mock_agents()
     print(f"  - Agents: {', '.join(registry.list_agents())}")
     print()
 
     # Step 3: Set up governance
-    print("[3/5] Initializing Ma'aT governance engine...")
+    print("[3/7] Initializing Ma'aT governance engine...")
     governance = MaaTGovernanceEngine(user_trust_score=0.85)
     print(f"  - Principles: {', '.join(governance.get_principles().keys())}")
     print()
 
-    # Step 4: Run orchestration
+    # Step 4: Set up prompt compiler
+    print("[4/7] Initializing prompt compiler...")
+    config_path = PACKAGE_DIR / "config"
+    compiler = PromptCompiler(templates_path=str(config_path))
+    print(f"  - Templates: {', '.join(compiler.list_templates())}")
+    print()
+
+    # Step 5: Set up schema validator
+    print("[5/7] Initializing schema validator...")
+    validator = SchemaValidator(config={"auto_repair": True, "max_repair_attempts": 3})
+    print(f"  - Auto-repair: enabled")
+    print()
+
+    # Step 6: Run orchestration
     task = "Design and implement a new authentication system with JWT tokens, " \
            "password hashing, and role-based access control"
 
-    print("[4/5] Running orchestration...")
+    print("[6/7] Running orchestration...")
     print(f"  Task: {task}")
     print("-" * 70)
 
@@ -150,6 +167,11 @@ def main():
             "reasoning": "Agent not found in registry",
         }
 
+    def agent_provider_resolver(agent_name):
+        if registry.has_agent(agent_name):
+            return registry.get_agent(agent_name).config.model_provider
+        return "mock"
+
     def governance_checker(action_type, details, ctx):
         return governance.evaluate_action(action_type, details, ctx)
 
@@ -161,13 +183,16 @@ def main():
         },
         agent_executor=agent_executor,
         governance_checker=governance_checker,
+        prompt_compiler=compiler,
+        schema_validator=validator,
+        agent_provider_resolver=agent_provider_resolver,
     )
 
     ledger = orchestrator.run(task, context)
 
-    # Step 5: Display results
+    # Step 7: Display results
     print()
-    print("[5/5] Results")
+    print("[7/7] Results")
     print("=" * 70)
     print(f"  Run ID:        {ledger.run_id}")
     print(f"  Final State:   {ledger.state}")
@@ -190,7 +215,28 @@ def main():
     print("-" * 70)
     for r in ledger.agent_responses:
         flags = ", ".join(r.risk_flags) if r.risk_flags else "none"
-        print(f"  {r.agent_name:12s} ({r.role:18s}) conf={r.confidence:.2f}  flags={flags}")
+        compiled = "compiled" if r.metadata.get("compiled") else "raw"
+        print(f"  {r.agent_name:12s} ({r.role:18s}) conf={r.confidence:.2f}  flags={flags}  [{compiled}]")
+    print()
+
+    # Prompt compiler stats
+    compiler_stats = compiler.get_compilation_stats()
+    print("Prompt Compiler Stats:")
+    print("-" * 70)
+    print(f"  Compilations:     {compiler_stats['total_compilations']}")
+    print(f"  Total tokens est: {compiler_stats['total_tokens_estimated']}")
+    print(f"  Avg tokens/prompt:{compiler_stats['average_tokens_per_prompt']}")
+    print(f"  Compression rate: {compiler_stats['compression_rate']:.1%}")
+    print()
+
+    # Schema validator stats
+    validator_stats = validator.get_validation_stats()
+    print("Schema Validator Stats:")
+    print("-" * 70)
+    print(f"  Validations:      {validator_stats['total_validations']}")
+    print(f"  Success rate:     {validator_stats['success_rate']:.1%}")
+    print(f"  Repair rate:      {validator_stats['repair_rate']:.1%}")
+    print(f"  Errors by role:   {validator_stats['errors_by_role'] or 'none'}")
     print()
 
     # Governance audit
@@ -209,6 +255,8 @@ def main():
     print("  [x] Model-agnostic abstraction (MockModelClient swappable for OpenAI/Anthropic/Ollama)")
     print("  [x] Conductor + Specialist pattern (5 specialist agents)")
     print("  [x] Structured output parsing (OUTPUT/CONFIDENCE/RISK_FLAGS/REASONING)")
+    print("  [x] Prompt compiler (template selection, context pruning, model adaptation, token budgets)")
+    print("  [x] Schema validator (output format enforcement, auto-repair, validation stats)")
     print("  [x] Ma'aT governance layer (constitutional principle checks)")
     print("  [x] Complete audit trail (RunLedger with all decisions)")
     print("  [x] Hard termination limits (max_phases=3)")
@@ -229,7 +277,8 @@ def main():
     print("  1. Run 'python orchestrator.py init' to set up your project")
     print("  2. Add API keys to .orchestrator/.env")
     print("  3. Customize agents in .orchestrator/agents.yaml")
-    print('  4. Run: python orchestrator.py run "your task here"')
+    print("  4. Customize prompt templates in config/prompt_templates.yaml")
+    print('  5. Run: python orchestrator.py run "your task here"')
     print()
     print("  Swap models by changing model_provider in agents.yaml:")
     print("    anthropic -> OpenAI/GPT")

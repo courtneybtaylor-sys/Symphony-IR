@@ -1,0 +1,130 @@
+templates:
+  architect:
+    goal: Design system architecture and identify constraints
+    constraints:
+    - Focus on high-level design, not implementation details
+    - Identify risks and dependencies
+    - Consider scalability and maintainability
+    output_schema:
+      format: json
+      required_fields:
+      - system_design
+      - risks
+      - constraints
+      schema:
+        system_design: string
+        components:
+        - string
+        risks:
+        - string
+        constraints:
+        - string
+      example:
+        system_design: Microservices architecture with API Gateway
+        components:
+        - API Gateway
+        - Auth Service
+        - Data Service
+        risks:
+        - Single point of failure in gateway
+        constraints:
+        - Must support 10k concurrent users
+      error_format:
+        error: description of what went wrong
+    model_preferences:
+      anthropic: Use structured thinking. Consider edge cases thoroughly.
+      openai: Be concise and action-oriented. Focus on practical implementation.
+
+  researcher:
+    goal: Find relevant documentation, APIs, and best practices
+    constraints:
+    - Cite sources where possible
+    - Focus on recent, authoritative sources
+    - Identify existing solutions before proposing new ones
+    output_schema:
+      format: json
+      required_fields:
+      - findings
+      - sources
+      schema:
+        findings:
+        - string
+        sources:
+        - title: string
+          relevance: string
+        recommendations:
+        - string
+    model_preferences:
+      anthropic: Be thorough in analysis. Consider multiple perspectives.
+      openai: Prioritize actionable findings.
+
+  implementer:
+    goal: Write production-quality code
+    constraints:
+    - Follow best practices for the language
+    - Include error handling
+    - Write clean, maintainable code
+    - Add inline comments for complex logic only
+    output_schema:
+      format: json
+      required_fields:
+      - code
+      - explanation
+      schema:
+        code: string
+        explanation: string
+        dependencies:
+        - string
+        testing_notes: string
+      example:
+        code: "def calculate(x, y):\n    return x + y"
+        explanation: Simple addition function
+        dependencies: []
+        testing_notes: Test with negative numbers and zero
+    model_preferences:
+      anthropic: Prioritize code quality over brevity.
+      openai: Use modern idioms and patterns.
+
+  reviewer:
+    goal: Critically analyze code and designs for issues
+    constraints:
+    - Identify bugs and edge cases
+    - Check for security vulnerabilities
+    - Suggest concrete improvements
+    - Be constructive, not just critical
+    output_schema:
+      format: json
+      required_fields:
+      - issues
+      - suggestions
+      schema:
+        issues:
+        - severity: string
+          description: string
+          location: string
+        suggestions:
+        - string
+        overall_assessment: string
+    model_preferences:
+      anthropic: Be thorough. Consider edge cases and failure modes.
+      openai: Focus on actionable, prioritized feedback.
+
+  integrator:
+    goal: Synthesize outputs from all agents into a coherent deliverable
+    constraints:
+    - Resolve conflicts between agent outputs
+    - Create unified, consistent output
+    - Balance competing trade-offs explicitly
+    output_schema:
+      format: json
+      required_fields:
+      - integrated_output
+      - resolution_notes
+      schema:
+        integrated_output: string
+        resolution_notes:
+        - string
+        confidence: number
+    model_preferences:
+      anthropic: Focus on coherence and completeness.
+      openai: Prioritize clarity and actionability.
