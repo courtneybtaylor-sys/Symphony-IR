@@ -30,8 +30,8 @@ REM Get current directory
 set "SCRIPT_DIR=%~dp0"
 
 REM Check if running from correct directory
-if not exist "%SCRIPT_DIR%gui\desktop_app.py" (
-    echo ❌ Error: desktop_app.py not found!
+if not exist "%SCRIPT_DIR%gui\main.py" (
+    echo ❌ Error: gui/main.py not found!
     echo.
     echo Please run this script from the Symphony-IR root directory.
     echo.
@@ -63,7 +63,7 @@ set PYTHONPATH=%SCRIPT_DIR%
 set SYMPHONY_HOME=%SCRIPT_DIR%
 
 REM Start the application
-python "%SCRIPT_DIR%gui\desktop_app.py"
+python "%SCRIPT_DIR%gui\main.py"
 
 if errorlevel 1 (
     echo.

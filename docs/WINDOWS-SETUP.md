@@ -92,7 +92,7 @@ For developers or custom setups.
 
 5. **Run the application:**
    ```bash
-   python gui\desktop_app.py
+   python gui\main.py
    ```
 
 ## First Time Setup
@@ -103,7 +103,7 @@ For developers or custom setups.
 
 **Start Menu:** Click Windows key, search "Symphony-IR"
 
-**Command Line:** `python gui\desktop_app.py`
+**Command Line:** `python gui\main.py`
 
 ### Step 2: Configure API Provider
 
@@ -155,7 +155,7 @@ After installation, you'll have:
 Create a custom shortcut:
 
 1. **Right-click** on Desktop → **New** → **Shortcut**
-2. **Target:** `python.exe C:\Program Files\Symphony-IR\gui\desktop_app.py`
+2. **Target:** `python.exe C:\Program Files\Symphony-IR\gui\main.py`
 3. **Start in:** `C:\Program Files\Symphony-IR`
 4. **Name:** Symphony-IR
 
@@ -262,7 +262,7 @@ pip install PyQt6 PyQt6-Charts streamlit anthropic pyyaml requests
    ```batch
    @echo off
    set QT_QPA_PLATFORM_PLUGIN_PATH=
-   python gui\desktop_app.py
+   python gui\main.py
    ```
 2. Double-click `run.bat`
 

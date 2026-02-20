@@ -22,7 +22,7 @@ set SYMPHONY_HOME=%INSTALL_DIR%
 
 REM Start the desktop application
 echo Starting Symphony-IR Desktop Application...
-python "%INSTALL_DIR%\gui\desktop_app.py"
+python "%INSTALL_DIR%\gui\main.py"
 
 if errorlevel 1 (
     echo.
