@@ -1,0 +1,12 @@
+# Desktop GUI Requirements
+PyQt6==6.6.1
+PyQt6-Charts==6.6.0
+
+# Existing dependencies
+streamlit==1.28.1
+anthropic==0.7.0
+pyyaml==6.0
+requests==2.31.0
+
+# Packaging
+PyInstaller==6.1.0

@@ -41,6 +41,25 @@ Deterministic multi-agent orchestration engine with structured guidance and Web 
 
 ### Quick Start
 
+**Windows Users: Desktop GUI (No Terminal!)**
+
+```batch
+REM Download or clone Symphony-IR
+REM Then double-click: run-gui.bat
+
+REM Or use PowerShell installer:
+REM   Right-click PowerShell as Admin
+REM   Run: .\windows\install.ps1
+```
+
+See [docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md) for complete Windows installation guide with:
+- One-click installer
+- Standalone executable
+- Desktop shortcuts
+- System tray integration
+
+**Linux/macOS or Advanced Users:**
+
 ```bash
 # Clone and install
 git clone https://github.com/courtneybtaylor-sys/Symphony-IR.git
@@ -55,6 +74,37 @@ export ANTHROPIC_API_KEY=sk-...
 ```
 
 ## Usage
+
+### Via Desktop GUI (Windows - Easiest!)
+
+**No terminal commands needed!**
+
+```batch
+REM Simply double-click:
+run-gui.bat
+```
+
+Or use the installer:
+```powershell
+# Right-click PowerShell as Admin, then:
+.\windows\install.ps1
+```
+
+The desktop app includes:
+- 🎼 **Orchestrator Tab**: Run AI orchestration tasks with full control
+- 🗺️ **Symphony Flow Tab**: Guided workflows (Code Review, API Design, Testing, etc.)
+- 📋 **History Tab**: Browse all past executions
+- ⚙️ **Settings Tab**: Configure API keys, models, preferences
+
+**Features:**
+- ✅ Point-and-click interface
+- ✅ Real-time progress and output
+- ✅ Session history and management
+- ✅ Settings persistence
+- ✅ Works with Claude (cloud) or Ollama (local)
+- ✅ No terminal required
+
+See [docs/WINDOWS-SETUP.md](docs/WINDOWS-SETUP.md) for detailed setup.
 
 ### Via CLI (Traditional)
 
