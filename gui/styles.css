@@ -1,0 +1,288 @@
+/* Symphony-IR Custom Styles - Dark Theme Capable */
+
+/* Root variables for theme flexibility */
+:root {
+    /* Light theme colors */
+    --primary-color: #1f77b4;
+    --primary-dark: #1557a0;
+    --primary-light: #4ca3ff;
+    --accent-color: #ff7f0e;
+    --success-color: #2ca02c;
+    --error-color: #d62728;
+    --warning-color: #ff9800;
+    --info-color: #17a2b8;
+    --background: #ffffff;
+    --surface: #f8f9fa;
+    --text-primary: #1a1a1a;
+    --text-secondary: #666666;
+    --border-color: #e0e0e0;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --primary-color: #4ca3ff;
+        --primary-dark: #2d7fcc;
+        --primary-light: #7bb8ff;
+        --accent-color: #ffb366;
+        --success-color: #4caf50;
+        --error-color: #ff6b6b;
+        --warning-color: #ffb74d;
+        --info-color: #29b6f6;
+        --background: #0d1117;
+        --surface: #161b22;
+        --text-primary: #e6edf3;
+        --text-secondary: #8b949e;
+        --border-color: #30363d;
+        --shadow: rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Streamlit button styling */
+button {
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.2s ease !important;
+    border: none !important;
+    padding: 10px 20px !important;
+}
+
+/* Primary buttons */
+[data-testid="baseButton-primary"] {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px var(--shadow) !important;
+}
+
+[data-testid="baseButton-primary"]:hover {
+    background-color: var(--primary-dark) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px var(--shadow) !important;
+}
+
+[data-testid="baseButton-primary"]:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 8px var(--shadow) !important;
+}
+
+/* Secondary buttons */
+[data-testid="baseButton-secondary"] {
+    background-color: var(--surface) !important;
+    color: var(--primary-color) !important;
+    border: 2px solid var(--primary-color) !important;
+    box-shadow: 0 2px 8px var(--shadow) !important;
+}
+
+[data-testid="baseButton-secondary"]:hover {
+    background-color: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px var(--shadow) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Button spacing improvements */
+.stButton > button {
+    width: 100%;
+}
+
+/* Tab styling */
+[data-baseweb="tab-list"] {
+    border-bottom: 2px solid var(--border-color) !important;
+}
+
+[data-baseweb="tab"] {
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.5px !important;
+    padding: 12px 24px !important;
+    border-radius: 8px 8px 0 0 !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-baseweb="tab"]:hover {
+    color: var(--primary-color) !important;
+    background-color: var(--surface) !important;
+}
+
+[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--primary-color) !important;
+    border-bottom: 3px solid var(--primary-color) !important;
+}
+
+/* Headers and Typography */
+h1, h2, h3, h4, h5, h6 {
+    letter-spacing: 0.5px !important;
+    font-weight: 600 !important;
+}
+
+h1 {
+    color: var(--text-primary) !important;
+    margin-bottom: 24px !important;
+    padding-bottom: 12px !important;
+}
+
+h2 {
+    color: var(--text-primary) !important;
+    margin-top: 24px !important;
+    margin-bottom: 16px !important;
+}
+
+h3 {
+    color: var(--text-secondary) !important;
+    margin-top: 16px !important;
+    margin-bottom: 12px !important;
+}
+
+/* Text area and input styling */
+textarea, input {
+    border-radius: 6px !important;
+    border: 1px solid var(--border-color) !important;
+    transition: all 0.2s ease !important;
+}
+
+textarea:focus, input:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(31, 119, 180, 0.1) !important;
+}
+
+/* Expander styling */
+[data-testid="stExpander"] {
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    margin-bottom: 12px !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stExpander"]:hover {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 2px 8px var(--shadow) !important;
+}
+
+/* Metric cards */
+[data-testid="stMetricContainer"] {
+    background: var(--surface) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    border: 1px solid var(--border-color) !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stMetricContainer"]:hover {
+    box-shadow: 0 4px 12px var(--shadow) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Success, error, info messages */
+[data-testid="stSuccess"] {
+    border-radius: 8px !important;
+    border-left: 4px solid var(--success-color) !important;
+    background-color: rgba(44, 160, 44, 0.1) !important;
+    padding: 12px 16px !important;
+}
+
+[data-testid="stError"] {
+    border-radius: 8px !important;
+    border-left: 4px solid var(--error-color) !important;
+    background-color: rgba(214, 39, 40, 0.1) !important;
+    padding: 12px 16px !important;
+}
+
+[data-testid="stWarning"] {
+    border-radius: 8px !important;
+    border-left: 4px solid var(--warning-color) !important;
+    background-color: rgba(255, 152, 0, 0.1) !important;
+    padding: 12px 16px !important;
+}
+
+[data-testid="stInfo"] {
+    border-radius: 8px !important;
+    border-left: 4px solid var(--info-color) !important;
+    background-color: rgba(23, 162, 184, 0.1) !important;
+    padding: 12px 16px !important;
+}
+
+/* Spinner styling */
+[role="status"] {
+    color: var(--primary-color) !important;
+}
+
+/* Code blocks */
+code {
+    background-color: var(--surface) !important;
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+    color: var(--accent-color) !important;
+}
+
+/* Divider */
+hr {
+    border-color: var(--border-color) !important;
+    margin: 24px 0 !important;
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    border: 2px dashed var(--border-color) !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    transition: all 0.2s ease !important;
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: var(--primary-color) !important;
+    background-color: var(--surface) !important;
+}
+
+/* Sidebar styling */
+[data-testid="stSidebar"] {
+    border-right: 1px solid var(--border-color) !important;
+}
+
+/* Column and container spacing */
+.stColumn {
+    padding: 0 8px !important;
+}
+
+/* Download button */
+[data-testid="stDownloadButton"] > button {
+    background: linear-gradient(135deg, var(--success-color), var(--info-color)) !important;
+    color: white !important;
+}
+
+[data-testid="stDownloadButton"] > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 16px var(--shadow) !important;
+}
+
+/* Caption and small text */
+.stCaption {
+    color: var(--text-secondary) !important;
+}
+
+/* Number input styling */
+[data-testid="stNumberInput"] input {
+    border-radius: 6px !important;
+}
+
+/* Checkbox styling */
+[data-testid="stCheckbox"] {
+    padding: 8px 0 !important;
+}
+
+[data-testid="stCheckbox"] input {
+    cursor: pointer !important;
+    accent-color: var(--primary-color) !important;
+}
+
+/* General page background */
+.main {
+    background-color: var(--background) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Smooth transitions */
+* {
+    transition: background-color 0.2s ease, color 0.2s ease !important;
+}
