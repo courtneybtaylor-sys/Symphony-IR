@@ -91,7 +91,7 @@ $ShortcutPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Symphony-IR.
 $WshShell = New-Object -ComObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath = "python.exe"
-$Shortcut.Arguments = "`"$InstallPath\gui\desktop_app.py`""
+$Shortcut.Arguments = "`"$InstallPath\gui\main.py`""
 $Shortcut.WorkingDirectory = $InstallPath
 $Shortcut.Description = "Symphony-IR - AI Orchestrator"
 $Shortcut.Save()
@@ -102,7 +102,7 @@ Write-Host "✅ Created Start Menu shortcut" -ForegroundColor Green
 $DesktopPath = "$env:USERPROFILE\Desktop\Symphony-IR.lnk"
 $DesktopShortcut = $WshShell.CreateShortcut($DesktopPath)
 $DesktopShortcut.TargetPath = "python.exe"
-$DesktopShortcut.Arguments = "`"$InstallPath\gui\desktop_app.py`""
+$DesktopShortcut.Arguments = "`"$InstallPath\gui\main.py`""
 $DesktopShortcut.WorkingDirectory = $InstallPath
 $DesktopShortcut.Description = "Symphony-IR - AI Orchestrator"
 $DesktopShortcut.Save()
