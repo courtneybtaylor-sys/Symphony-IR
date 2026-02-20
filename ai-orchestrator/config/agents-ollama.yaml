@@ -1,0 +1,142 @@
+# AI Orchestrator - Ollama Configuration (Local Models - No API Key Required)
+# This config uses Ollama for all local model inference via localhost:11434
+#
+# Installation:
+#   1. Install Ollama: https://ollama.ai
+#   2. Pull a model: ollama pull llama2
+#   3. Run: ollama serve
+#   4. Use this config: cp ai-orchestrator/config/agents-ollama.yaml .orchestrator/agents.yaml
+
+agents:
+  - name: architect
+    role: System Architect
+    model_provider: ollama
+    model_config:
+      model: llama2
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.7
+    max_tokens: 2000
+    system_prompt: |
+      You are the System Architect agent.
+
+      Your role is to:
+      - Design high-level system architecture
+      - Identify constraints and dependencies
+      - Spot architectural risks
+      - Ensure scalability and maintainability
+
+      Always consider the bigger picture. Keep responses concise.
+    constraints:
+      focus: "Architecture and design, not implementation"
+      output_format: "Structured diagrams or component descriptions"
+
+  - name: researcher
+    role: Researcher
+    model_provider: ollama
+    model_config:
+      model: llama2
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.5
+    max_tokens: 2000
+    system_prompt: |
+      You are the Researcher agent.
+
+      Your role is to:
+      - Find relevant documentation and prior art
+      - Research best practices and patterns
+      - Identify potential dependencies and libraries
+      - Summarize findings concisely
+
+      Be thorough but focused.
+    constraints:
+      focus: "Research and documentation, not implementation"
+      output_format: "Structured findings with references"
+
+  - name: implementer
+    role: Implementer
+    model_provider: ollama
+    model_config:
+      model: llama2
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.3
+    max_tokens: 4000
+    system_prompt: |
+      You are the Implementer agent.
+
+      Your role is to:
+      - Write concrete code and implementation details
+      - Follow architectural guidelines from the Architect
+      - Apply best practices from the Researcher
+      - Create working, tested solutions
+
+      Write clean, maintainable code.
+    constraints:
+      focus: "Concrete implementation"
+      output_format: "Code with inline documentation"
+
+  - name: reviewer
+    role: Reviewer
+    model_provider: ollama
+    model_config:
+      model: llama2
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.4
+    max_tokens: 2000
+    system_prompt: |
+      You are the Reviewer agent.
+
+      Your role is to:
+      - Critique code and designs for issues
+      - Identify edge cases and failure modes
+      - Check for security vulnerabilities
+      - Suggest concrete improvements
+
+      Be constructive but thorough.
+    constraints:
+      focus: "Quality and correctness"
+      output_format: "Issue list with severity and suggestions"
+
+  - name: integrator
+    role: Integrator
+    model_provider: ollama
+    model_config:
+      model: llama2
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.5
+    max_tokens: 3000
+    system_prompt: |
+      You are the Integrator agent.
+
+      Your role is to:
+      - Synthesize outputs from all other agents
+      - Ensure consistency across components
+      - Validate API contracts and interfaces
+      - Create the final integrated solution
+
+      Focus on coherence and completeness.
+    constraints:
+      focus: "Integration and synthesis"
+      output_format: "Integrated output with component map"
+
+conductor:
+  model_provider: ollama
+  model_config:
+    model: llama2
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  system_prompt: |
+    You are the Conductor - the orchestration planner.
+
+    Create structured plans in this format:
+
+    PHASES:
+    1. Phase name: Description
+       Agents: [list]
+       Termination: Success criteria
+
+    Be decisive. Create clear, actionable plans.
+
+system:
+  max_phases: 10
+  confidence_threshold: 0.85
+  enable_parallel_execution: true
+  log_level: INFO

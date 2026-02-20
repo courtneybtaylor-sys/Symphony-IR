@@ -29,8 +29,15 @@ Deterministic multi-agent orchestration engine with structured guidance and Web 
 ## Installation
 
 ### Prerequisites
+
+**Option A: Use Cloud Claude (Recommended for Quality)**
 - Python 3.9+
 - API key for Claude (Anthropic)
+
+**Option B: Use Local Ollama (Free, No API Key Required)**
+- Python 3.9+
+- Ollama installed (https://ollama.ai)
+- A local LLM model (llama2, mistral, etc.)
 
 ### Quick Start
 
@@ -227,6 +234,34 @@ Choice: A
 6. Browse previous sessions in Sessions tab
 7. Analyze metrics in Metrics tab
 
+### Example 3: Using Local Ollama Models (No API Key Needed)
+
+```bash
+# Install and start Ollama
+brew install ollama        # or from https://ollama.ai
+ollama pull llama2         # Download a model
+ollama serve              # Start server (runs on localhost:11434)
+
+# Use Ollama config
+cp ai-orchestrator/config/agents-ollama.yaml .orchestrator/agents.yaml
+
+# Run workflows with local models (completely free)
+python orchestrator.py run "Your task here"
+python orchestrator.py flow --template code_review --var component=src/main.py
+```
+
+See [docs/OLLAMA.md](docs/OLLAMA.md) for:
+- Model selection guide (llama2, mistral, dolphin-mixtral)
+- Performance tips and GPU acceleration
+- Cost comparison (Ollama: free vs Claude: paid)
+- Troubleshooting guide
+
+**Available Local Models:**
+- `llama2`: Fast, good quality (4GB) - default
+- `mistral`: Faster & better (5GB) - recommended
+- `neural-chat`: Great for conversations (5GB)
+- `dolphin-mixtral`: Most capable (45GB, requires 24GB+ VRAM)
+
 ## Development
 
 ### Adding a New Flow Template
@@ -247,8 +282,13 @@ python orchestrator.py history
 cd gui
 streamlit run app.py
 
-# Test Flow (with feature flag)
-export SYMPHONY_EXPERIMENTAL_FLOW=1
+# Test Flow
+python orchestrator.py flow-list
+python orchestrator.py flow --template code_review --var component=test.py
+
+# Test with local Ollama
+cp ai-orchestrator/config/agents-ollama.yaml .orchestrator/agents.yaml
+ollama serve &
 python orchestrator.py flow --template code_review --var component=test.py
 ```
 
@@ -258,15 +298,28 @@ python orchestrator.py flow --template code_review --var component=test.py
 Ensure you're in the `ai-orchestrator` directory or use full path.
 
 ### API key errors
+**If using Claude:**
 ```bash
 export ANTHROPIC_API_KEY=sk-...
 # Or set in .orchestrator/.env
 ```
 
-### Flow command not found
-Enable experimental feature:
+**If using local Ollama (no key needed):**
 ```bash
-export SYMPHONY_EXPERIMENTAL_FLOW=1
+cp ai-orchestrator/config/agents-ollama.yaml .orchestrator/agents.yaml
+ollama serve
+```
+
+### Ollama connection errors
+```bash
+# Ensure Ollama is running
+ollama serve
+
+# Check it's accessible
+curl http://localhost:11434/api/tags
+
+# If remote, set custom URL
+export OLLAMA_BASE_URL=http://your-host:11434
 ```
 
 ### GUI timeout

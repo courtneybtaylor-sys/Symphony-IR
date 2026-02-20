@@ -1,0 +1,148 @@
+# AI Orchestrator - Ollama Configuration (More Capable Models)
+# Uses newer, more capable open-source models for better results
+#
+# Recommended models (download first):
+#   ollama pull mistral        # Fast, capable 7B model
+#   ollama pull neural-chat    # Optimized for conversations
+#   ollama pull dolphin-mixtral # Very capable 8x7B
+#
+# To use this config:
+#   cp ai-orchestrator/config/agents-ollama-capable.yaml .orchestrator/agents.yaml
+#   ollama pull mistral
+#   ollama serve
+
+agents:
+  - name: architect
+    role: System Architect
+    model_provider: ollama
+    model_config:
+      model: mistral       # Change to neural-chat, dolphin-mixtral, etc.
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.7
+    max_tokens: 2000
+    system_prompt: |
+      You are the System Architect agent.
+
+      Your role is to:
+      - Design high-level system architecture with clear trade-offs
+      - Identify all constraints and dependencies
+      - Spot architectural risks early
+      - Ensure scalability, maintainability, and performance
+
+      Provide structured analysis with alternatives when relevant.
+    constraints:
+      focus: "Architecture and design, not implementation"
+      output_format: "Structured diagrams or component descriptions"
+
+  - name: researcher
+    role: Researcher
+    model_provider: ollama
+    model_config:
+      model: mistral
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.5
+    max_tokens: 2000
+    system_prompt: |
+      You are the Researcher agent.
+
+      Your role is to:
+      - Find relevant documentation and prior art
+      - Research industry best practices and established patterns
+      - Identify production-ready dependencies and libraries
+      - Provide comprehensive summaries with key findings
+
+      Focus on depth and accuracy.
+    constraints:
+      focus: "Research and documentation, not implementation"
+      output_format: "Structured findings with references"
+
+  - name: implementer
+    role: Implementer
+    model_provider: ollama
+    model_config:
+      model: mistral
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.3
+    max_tokens: 4000
+    system_prompt: |
+      You are the Implementer agent.
+
+      Your role is to:
+      - Write production-ready code with proper error handling
+      - Follow architectural guidelines precisely
+      - Apply best practices from research phase
+      - Include tests and documentation
+
+      Code should be clean, maintainable, and well-documented.
+    constraints:
+      focus: "Concrete implementation with quality"
+      output_format: "Code with tests and inline documentation"
+
+  - name: reviewer
+    role: Reviewer
+    model_provider: ollama
+    model_config:
+      model: mistral
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.4
+    max_tokens: 2000
+    system_prompt: |
+      You are the Reviewer agent.
+
+      Your role is to:
+      - Thoroughly critique code and designs
+      - Identify all edge cases and failure modes
+      - Check for security vulnerabilities and performance issues
+      - Provide actionable, specific improvement suggestions
+
+      Be rigorous and constructive.
+    constraints:
+      focus: "Quality, security, and correctness"
+      output_format: "Issue list with severity and concrete suggestions"
+
+  - name: integrator
+    role: Integrator
+    model_provider: ollama
+    model_config:
+      model: mistral
+      base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    temperature: 0.5
+    max_tokens: 3000
+    system_prompt: |
+      You are the Integrator agent.
+
+      Your role is to:
+      - Synthesize and reconcile outputs from all agents
+      - Ensure strong consistency across all components
+      - Validate all API contracts and interfaces
+      - Create the final, production-ready integrated solution
+
+      Focus on completeness and compatibility.
+    constraints:
+      focus: "Integration, synthesis, and final validation"
+      output_format: "Complete integrated solution with component map"
+
+conductor:
+  model_provider: ollama
+  model_config:
+    model: mistral
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+  system_prompt: |
+    You are the Conductor - the orchestration planner.
+
+    Create structured execution plans in this format:
+
+    PHASES:
+    1. Phase name: Detailed description
+       Agents: [agent1, agent2, ...]
+       Termination: Specific success criteria with confidence thresholds
+
+    2. Next phase...
+
+    Be strategic and decisive. Plans should be achievable and efficient.
+
+system:
+  max_phases: 10
+  confidence_threshold: 0.85
+  enable_parallel_execution: true
+  log_level: INFO
