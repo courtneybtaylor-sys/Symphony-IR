@@ -1,0 +1,107 @@
+template_id: "api_design"
+name: "API Design & Specification"
+description: "Guided workflow for designing RESTful and GraphQL APIs"
+
+nodes:
+  start:
+    summary: "Defining API scope"
+    role: "architect"
+    intent: "Define scope and requirements for {api_name} API"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints: []
+    token_budget_hint: 900
+    options:
+      - id: "A"
+        label: "REST API"
+        description: "Design a RESTful API with standard HTTP methods"
+        next_node_id: "rest_design"
+      - id: "B"
+        label: "GraphQL API"
+        description: "Design a GraphQL API with schemas and queries"
+        next_node_id: "graphql_design"
+      - id: "C"
+        label: "Hybrid API"
+        description: "Design both REST and GraphQL endpoints"
+        next_node_id: "hybrid_design"
+
+  rest_design:
+    summary: "Designing REST API"
+    role: "architect"
+    intent: "Design REST API for {api_name} with endpoints, methods, and status codes"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Include endpoint specifications with HTTP methods"
+      - "Define request/response schemas"
+      - "Specify error handling and status codes"
+      - "Include authentication strategy"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Add security"
+        description: "Design authentication and authorization"
+        next_node_id: "rest_security"
+      - id: "B"
+        label: "Add versioning"
+        description: "Plan API versioning strategy"
+        next_node_id: "rest_versioning"
+
+  graphql_design:
+    summary: "Designing GraphQL API"
+    role: "architect"
+    intent: "Design GraphQL schema for {api_name} with types, queries, and mutations"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define GraphQL schema with types and relationships"
+      - "Specify queries and mutations"
+      - "Include subscription types if applicable"
+      - "Define error handling strategy"
+    token_budget_hint: 1500
+    options: []
+
+  hybrid_design:
+    summary: "Designing hybrid API"
+    role: "architect"
+    intent: "Design both REST and GraphQL APIs for {api_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Ensure consistency between REST and GraphQL"
+      - "Define mapping between endpoints and GraphQL queries"
+      - "Specify shared authentication model"
+    token_budget_hint: 1800
+    options: []
+
+  rest_security:
+    summary: "Planning REST security"
+    role: "reviewer"
+    intent: "Design authentication and authorization for REST {api_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Include OAuth 2.0, API keys, or JWT strategies"
+      - "Define rate limiting and quota policies"
+      - "Specify CORS and HTTPS requirements"
+    token_budget_hint: 1000
+    options: []
+
+  rest_versioning:
+    summary: "Planning REST versioning"
+    role: "architect"
+    intent: "Design versioning strategy for REST {api_name} (URL, header, content-type)"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints:
+      - "Compare versioning approaches"
+      - "Define deprecation policy"
+      - "Include migration path for clients"
+    token_budget_hint: 900
+    options: []

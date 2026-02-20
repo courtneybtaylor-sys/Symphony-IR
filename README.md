@@ -18,11 +18,13 @@ Deterministic multi-agent orchestration engine with structured guidance and Web 
 - **Metrics dashboard**: Track tokens, costs, confidence scores
 - **Session upload**: Import and analyze existing sessions
 
-### Experimental: Symphony Flow v0
+### Symphony Flow - Guided Decision-Tree Workflows
 - **Guided workflows**: Bounded decision trees (2-4 options per step)
-- **Template-based**: Pre-built workflows for common tasks
-- **Flow tracking**: Persistent state across decisions
+- **7 built-in templates**: Code review, refactoring, new features, API design, database schema, testing, documentation
+- **Flow tracking**: Persistent state across decisions with full history
 - **Direct PromptIR mapping**: Each node maps to orchestrator execution
+- **Interactive CLI**: Make bounded choices, automatic execution, real-time feedback
+- **Flow management**: List templates, view project status, browse sessions
 
 ## Installation
 
@@ -80,22 +82,42 @@ Then visit `http://localhost:8501` in your browser.
 
 See [gui/README.md](gui/README.md) for full documentation.
 
-### Via Symphony Flow (Experimental)
+### Via Symphony Flow - Guided Workflows
+
+List available templates:
 
 ```bash
-# Enable experimental feature
-export SYMPHONY_EXPERIMENTAL_FLOW=1
+python orchestrator.py flow-list
+```
 
-# Run guided workflow
+Run a guided workflow:
+
+```bash
 python orchestrator.py flow --template code_review --var component=auth.py
 python orchestrator.py flow --template refactor_code --var component=main.py
 python orchestrator.py flow --template new_feature --var feature="API endpoint"
+python orchestrator.py flow --template api_design --var api_name="user-service"
+python orchestrator.py flow --template database_schema --var database_name="accounts"
+python orchestrator.py flow --template testing_strategy --var component_name="payment"
+python orchestrator.py flow --template documentation --var project_name="MyProject"
 ```
 
-**Available Templates:**
-- `code_review`: Guided code review with focused paths (bugs, style, performance)
-- `refactor_code`: Structured refactoring guide (design improvements, quick fixes, dependency review)
-- `new_feature`: Feature implementation planning (architecture, checklist, risk analysis)
+View flow project status:
+
+```bash
+python orchestrator.py flow-status
+```
+
+**Built-in Templates:**
+- `code_review`: Guided code review (bugs, style, performance)
+- `refactor_code`: Refactoring guide (design, quick fixes, dependencies)
+- `new_feature`: Feature planning (architecture, checklist, risks)
+- `api_design`: API design (REST, GraphQL, hybrid)
+- `database_schema`: Database design (SQL, NoSQL, hybrid)
+- `testing_strategy`: Testing plans (unit, integration, performance, security)
+- `documentation`: Documentation planning (user, developer, architecture)
+
+See [docs/FLOW.md](docs/FLOW.md) for comprehensive guide.
 
 ## Architecture
 
@@ -209,10 +231,10 @@ Choice: A
 
 ### Adding a New Flow Template
 
-1. Create `flow/templates/my_template.yaml`
-2. Define template_id, nodes, and options
-3. Enable feature flag: `export SYMPHONY_EXPERIMENTAL_FLOW=1`
-4. Run: `python orchestrator.py flow --template my_template --var key=value`
+1. Create `ai-orchestrator/flow/templates/my_template.yaml`
+2. Define template_id, nodes, and options (see [docs/FLOW.md](docs/FLOW.md))
+3. Test it: `python orchestrator.py flow --template my_template --var key=value`
+4. View it: `python orchestrator.py flow-list`
 
 ### Running Tests
 
@@ -281,8 +303,8 @@ Part of Symphony-IR project
 ## Status
 
 - ✅ Core Orchestrator: Production ready
-- ✅ Streamlit GUI: Beta (v0.1)
-- ⚠️ Symphony Flow: Experimental (feature-flagged)
+- ✅ Streamlit GUI: Production ready (v1.0)
+- ✅ Symphony Flow: Production ready (7 templates)
 
 ---
 

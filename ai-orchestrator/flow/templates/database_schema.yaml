@@ -1,0 +1,109 @@
+template_id: "database_schema"
+name: "Database Schema Design"
+description: "Guided workflow for designing database schemas and relationships"
+
+nodes:
+  start:
+    summary: "Analyzing data requirements"
+    role: "architect"
+    intent: "Analyze requirements for {database_name} database"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints: []
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "Relational database"
+        description: "Design SQL schema with tables and relationships"
+        next_node_id: "sql_design"
+      - id: "B"
+        label: "NoSQL database"
+        description: "Design document or key-value schema"
+        next_node_id: "nosql_design"
+      - id: "C"
+        label: "Hybrid approach"
+        description: "Combine relational and NoSQL components"
+        next_node_id: "hybrid_db_design"
+
+  sql_design:
+    summary: "Designing SQL schema"
+    role: "architect"
+    intent: "Design SQL schema for {database_name} with tables, columns, and indexes"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define tables with columns and data types"
+      - "Include primary and foreign keys"
+      - "Plan indexes for performance"
+      - "Specify constraints and validations"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Optimization"
+        description: "Plan query optimization and indexing"
+        next_node_id: "sql_optimization"
+      - id: "B"
+        label: "Normalization review"
+        description: "Review normalization and denormalization"
+        next_node_id: "sql_normalization"
+
+  nosql_design:
+    summary: "Designing NoSQL schema"
+    role: "architect"
+    intent: "Design NoSQL schema for {database_name} with document structure and collections"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define document/collection structure"
+      - "Plan data denormalization strategy"
+      - "Include sharding/partitioning plan"
+      - "Specify consistency model"
+    token_budget_hint: 1500
+    options: []
+
+  hybrid_db_design:
+    summary: "Designing hybrid database"
+    role: "architect"
+    intent: "Design hybrid database for {database_name} combining relational and NoSQL"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define data distribution between systems"
+      - "Plan synchronization strategy"
+      - "Ensure consistency across data stores"
+    token_budget_hint: 1800
+    options: []
+
+  sql_optimization:
+    summary: "Planning SQL optimization"
+    role: "implementer"
+    intent: "Plan query optimization, indexing, and performance tuning for {database_name}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Identify slow queries and bottlenecks"
+      - "Recommend index strategies"
+      - "Include caching recommendations"
+      - "Plan query execution analysis"
+    token_budget_hint: 1200
+    options: []
+
+  sql_normalization:
+    summary: "Reviewing normalization"
+    role: "architect"
+    intent: "Review normalization levels and denormalization opportunities for {database_name}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Analyze current normalization level"
+      - "Identify denormalization opportunities"
+      - "Balance performance vs. data integrity"
+      - "Include materialized view recommendations"
+    token_budget_hint: 1200
+    options: []

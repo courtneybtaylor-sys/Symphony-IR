@@ -1,0 +1,118 @@
+template_id: "documentation"
+name: "Documentation Planning"
+description: "Guided workflow for creating comprehensive project documentation"
+
+nodes:
+  start:
+    summary: "Defining documentation scope"
+    role: "architect"
+    intent: "Plan documentation strategy for {project_name}"
+    phase: "PLANNING"
+    priority: 5
+    context_refs: []
+    constraints: []
+    token_budget_hint: 800
+    options:
+      - id: "A"
+        label: "User documentation"
+        description: "Create end-user guides and tutorials"
+        next_node_id: "user_docs"
+      - id: "B"
+        label: "Developer documentation"
+        description: "Create API and implementation guides"
+        next_node_id: "dev_docs"
+      - id: "C"
+        label: "Complete documentation"
+        description: "Plan all documentation types"
+        next_node_id: "complete_docs"
+
+  user_docs:
+    summary: "Planning user documentation"
+    role: "implementer"
+    intent: "Plan user-facing documentation for {project_name}"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints:
+      - "Include getting started guide"
+      - "Create feature documentation"
+      - "Plan troubleshooting section"
+      - "Include screenshots and examples"
+    token_budget_hint: 1100
+    options:
+      - id: "A"
+        label: "Add video tutorials"
+        description: "Plan video documentation"
+        next_node_id: "video_docs"
+
+  dev_docs:
+    summary: "Planning developer documentation"
+    role: "implementer"
+    intent: "Plan developer-facing documentation for {project_name}"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints:
+      - "Include API reference"
+      - "Create architecture documentation"
+      - "Plan code examples"
+      - "Include contribution guidelines"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Add architecture diagrams"
+        description: "Plan detailed architecture documentation"
+        next_node_id: "architecture_docs"
+
+  complete_docs:
+    summary: "Planning complete documentation"
+    role: "architect"
+    intent: "Plan comprehensive documentation suite for {project_name}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Include user guides and API reference"
+      - "Create architecture and design documentation"
+      - "Plan contribution and deployment guides"
+      - "Include FAQ and troubleshooting"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Add video content"
+        description: "Include video tutorials"
+        next_node_id: "video_docs"
+      - id: "B"
+        label: "Add architecture"
+        description: "Include detailed architecture docs"
+        next_node_id: "architecture_docs"
+
+  video_docs:
+    summary: "Planning video documentation"
+    role: "implementer"
+    intent: "Plan video tutorial documentation for {project_name}"
+    phase: "PLANNING"
+    priority: 5
+    context_refs: []
+    constraints:
+      - "List key topics for video tutorials"
+      - "Plan video structure and format"
+      - "Include scripting guidelines"
+      - "Plan hosting and distribution"
+    token_budget_hint: 900
+    options: []
+
+  architecture_docs:
+    summary: "Planning architecture documentation"
+    role: "architect"
+    intent: "Plan detailed architecture documentation for {project_name}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Include system architecture diagrams"
+      - "Document component interactions"
+      - "Explain design decisions"
+      - "Include deployment architecture"
+    token_budget_hint: 1200
+    options: []
