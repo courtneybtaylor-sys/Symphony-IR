@@ -616,6 +616,196 @@ def _setup_mock_agents(registry: AgentRegistry):
         registry.register_agent(agent)
 
 
+def cmd_flow(args):
+    """Execute guided flow workflow with bounded decision tree."""
+    # Feature flag check
+    if not os.getenv("SYMPHONY_EXPERIMENTAL_FLOW"):
+        print("❌ Experimental feature. Enable with:")
+        print("   export SYMPHONY_EXPERIMENTAL_FLOW=1")
+        return 1
+
+    from flow.engine import BranchEngine
+    from flow.adapter import IRAdapter
+
+    # Parse variables
+    variables = {}
+    for v in args.var:
+        if "=" not in v:
+            print(f"❌ Invalid variable format: {v}")
+            print("   Use: --var key=value")
+            return 1
+        key, val = v.split("=", 1)
+        variables[key] = val
+
+    # Template path
+    template_path = Path(PACKAGE_DIR) / "flow" / "templates" / f"{args.template}.yaml"
+    if not template_path.exists():
+        print(f"❌ Template not found: {template_path}")
+        print(f"   Available templates: code_review, refactor_code, new_feature")
+        return 1
+
+    # Set up logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
+
+    # Load environment
+    project_root = Path(args.project).resolve()
+    orch_dir = project_root / ".orchestrator"
+    env_file = orch_dir / ".env"
+    if env_file.exists():
+        _load_env_file(str(env_file))
+
+    # Load agent registry for execution
+    agents_yaml = orch_dir / "agents.yaml"
+    registry = AgentRegistry()
+    use_mock = False
+
+    if agents_yaml.exists():
+        try:
+            registry.load_from_yaml(str(agents_yaml))
+        except Exception as e:
+            logger.warning(f"Could not load agents config: {e}")
+            print("Falling back to mock agents.")
+            use_mock = True
+    else:
+        print("No agents.yaml found. Using mock agents.")
+        use_mock = True
+
+    if use_mock:
+        _setup_mock_agents(registry)
+
+    # Set up governance and compilation
+    governance = MaaTGovernanceEngine()
+    compiler = None
+    validator = None
+    ir_pipeline = None
+
+    if not args.no_compile:
+        try:
+            compiler = PromptCompiler(
+                templates_path=str(PACKAGE_DIR / "config"),
+                config={},
+            )
+        except Exception as e:
+            logger.warning(f"Could not initialize prompt compiler: {e}")
+
+        validator = SchemaValidator()
+
+        if not args.no_ir and compiler:
+            ir_governance = IRGovernanceChecker()
+            ir_plugins = [
+                ContextDigestPlugin(config={"max_context_refs": 10}),
+                BudgetOptimizerPlugin(),
+            ]
+            ir_pipeline = PromptIRPipeline(
+                plugins=ir_plugins,
+                governance=ir_governance,
+            )
+
+    # Agent executor
+    def agent_executor(agent_name, phase_brief, ctx):
+        if registry.has_agent(agent_name):
+            agent = registry.get_agent(agent_name)
+            return agent.execute(phase_brief, ctx)
+        else:
+            return {
+                "agent_name": agent_name,
+                "role": "unknown",
+                "output": f"Agent '{agent_name}' not found",
+                "confidence": 0.0,
+                "risk_flags": ["CRITICAL_missing_agent"],
+            }
+
+    def agent_provider_resolver(agent_name):
+        if registry.has_agent(agent_name):
+            return registry.get_agent(agent_name).config.model_provider
+        return "mock"
+
+    # Initialize engine
+    engine = BranchEngine(str(template_path))
+    engine.state.variables = variables
+    adapter = IRAdapter(engine.state)
+
+    orchestrator = Orchestrator(
+        config={"max_phases": 10, "confidence_threshold": 0.85},
+        agent_executor=agent_executor,
+        governance_checker=lambda at, ad, ctx: governance.evaluate_action(at, ad, ctx),
+        prompt_compiler=compiler,
+        schema_validator=validator,
+        agent_provider_resolver=agent_provider_resolver,
+        ir_pipeline=ir_pipeline,
+    )
+
+    print(f"🎼 Symphony Flow: {args.template}")
+    print(f"📋 Project: {engine.state.project_id}\n")
+
+    # Main decision loop
+    while True:
+        node = engine.get_current_node()
+
+        # Display current step
+        print(f"✓ {node.summary}\n")
+
+        # Terminal node check
+        if not node.options:
+            print("🎉 Workflow complete!\n")
+            break
+
+        # Show options
+        print("What's next?")
+        for opt in node.options:
+            print(f"  {opt.id}) {opt.label}")
+            if opt.description:
+                print(f"      {opt.description}")
+        print()
+
+        # Get choice
+        import click
+
+        choice = click.prompt("Choice", type=str).strip().upper()
+
+        # Validate
+        valid_ids = [o.id for o in node.options]
+        if choice not in valid_ids:
+            print(f"❌ Invalid choice. Choose from: {', '.join(valid_ids)}\n")
+            continue
+
+        # Navigate
+        next_node = engine.select_option(choice)
+
+        # Execute
+        print("\n⚙️  Executing via Symphony-IR...\n")
+
+        try:
+            prompt_ir = adapter.from_node(next_node)
+            result = orchestrator.run(next_node.summary, {"node_id": next_node.id})
+
+            # Display result summary
+            print(f"✓ Execution complete")
+            print(f"  Run ID: {result.run_id}")
+            print(f"  Confidence: {result.confidence:.2f}")
+            print(f"  Decisions: {len(result.decisions)}")
+            print()
+
+            # Record execution
+            engine.record_execution(next_node.id, result.run_id)
+
+        except Exception as e:
+            print(f"❌ Execution failed: {e}\n")
+            break
+
+    # Save state
+    save_path = orch_dir / "flows" / f"{engine.state.project_id}.json"
+    engine.save_state(str(save_path))
+    print(f"💾 Session saved: {save_path}")
+    print(f"🗺️  Path: {engine.get_path_summary()}")
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="AI Orchestrator - Deterministic multi-agent coordination engine",
@@ -688,6 +878,29 @@ def main():
         "--export", type=str, help="Export report to file"
     )
 
+    # flow (experimental)
+    flow_parser = subparsers.add_parser(
+        "flow", help="[EXPERIMENTAL] Guided decision-tree workflow execution"
+    )
+    flow_parser.add_argument(
+        "--template", required=True, help="Template name (code_review, refactor_code, new_feature)"
+    )
+    flow_parser.add_argument(
+        "--var", multiple=True, default=[], help="Variables (format: key=value)"
+    )
+    flow_parser.add_argument(
+        "--project", default=".", help="Project root directory (default: current dir)"
+    )
+    flow_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Detailed output"
+    )
+    flow_parser.add_argument(
+        "--no-compile", action="store_true", help="Disable prompt compiler"
+    )
+    flow_parser.add_argument(
+        "--no-ir", action="store_true", help="Disable IR pipeline"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -700,6 +913,7 @@ def main():
         "status": cmd_status,
         "history": cmd_history,
         "efficiency": cmd_efficiency,
+        "flow": cmd_flow,
     }
 
     return commands[args.command](args)

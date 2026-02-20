@@ -1,0 +1,72 @@
+template_id: "refactor_code"
+name: "Code Refactoring Guide"
+description: "Structured refactoring workflow with design and quick-fix paths"
+
+nodes:
+  start:
+    summary: "Analyzing code structure"
+    role: "architect"
+    intent: "Analyze the current structure and design of {component}"
+    phase: "PLANNING"
+    priority: 5
+    context_refs:
+      - "file:{component}"
+    constraints: []
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "Design improvements"
+        description: "Propose better architecture and design patterns"
+        next_node_id: "design"
+      - id: "B"
+        label: "Quick fixes"
+        description: "Identify quick refactoring wins with minimal risk"
+        next_node_id: "fixes"
+      - id: "C"
+        label: "Dependency review"
+        description: "Analyze and optimize dependencies"
+        next_node_id: "dependencies"
+
+  design:
+    summary: "Designing improvements"
+    role: "architect"
+    intent: "Design improved architecture for {component} following best practices"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Output as structured plan with diagrams or component descriptions"
+      - "Include migration strategy from current to proposed design"
+      - "Estimate implementation complexity"
+    token_budget_hint: 1200
+    options: []
+
+  fixes:
+    summary: "Finding quick wins"
+    role: "implementer"
+    intent: "Identify quick refactoring wins in {component} with high impact and low risk"
+    phase: "IMPLEMENTATION"
+    priority: 6
+    context_refs:
+      - "file:{component}"
+    constraints:
+      - "Prioritize by impact-to-effort ratio"
+      - "Include before/after code snippets"
+      - "Estimate time to implement each"
+    token_budget_hint: 900
+    options: []
+
+  dependencies:
+    summary: "Reviewing dependencies"
+    role: "architect"
+    intent: "Analyze and optimize dependencies in {component}"
+    phase: "PLANNING"
+    priority: 6
+    context_refs:
+      - "file:{component}"
+    constraints:
+      - "List current dependencies with versions"
+      - "Identify unused or redundant dependencies"
+      - "Suggest alternatives or upgrades"
+    token_budget_hint: 800
+    options: []

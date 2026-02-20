@@ -1,0 +1,72 @@
+template_id: "new_feature"
+name: "Feature Implementation Guide"
+description: "Guided workflow for planning and implementing new features"
+
+nodes:
+  start:
+    summary: "Defining feature requirements"
+    role: "architect"
+    intent: "Define and clarify requirements for {feature}"
+    phase: "PLANNING"
+    priority: 6
+    context_refs: []
+    constraints: []
+    token_budget_hint: 800
+    options:
+      - id: "A"
+        label: "Design architecture"
+        description: "Create detailed technical design and architecture"
+        next_node_id: "design"
+      - id: "B"
+        label: "Create checklist"
+        description: "Build step-by-step implementation checklist"
+        next_node_id: "checklist"
+      - id: "C"
+        label: "Risk analysis"
+        description: "Identify risks and mitigation strategies"
+        next_node_id: "risks"
+
+  design:
+    summary: "Designing feature architecture"
+    role: "architect"
+    intent: "Design architecture for {feature} including components, interfaces, and data models"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Include system architecture diagram description"
+      - "Define component interfaces and contracts"
+      - "Specify data models and API endpoints"
+      - "Consider scalability and extensibility"
+    token_budget_hint: 1500
+    options: []
+
+  checklist:
+    summary: "Creating implementation checklist"
+    role: "implementer"
+    intent: "Create detailed implementation checklist for {feature} ordered by dependencies"
+    phase: "IMPLEMENTATION"
+    priority: 5
+    context_refs: []
+    constraints:
+      - "Order by dependency and logical sequence"
+      - "Estimate effort for each item"
+      - "Include testing and validation steps"
+      - "Specify success criteria"
+    token_budget_hint: 700
+    options: []
+
+  risks:
+    summary: "Analyzing risks"
+    role: "reviewer"
+    intent: "Identify and assess risks for implementing {feature}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Categorize risks by type (technical, timeline, resource)"
+      - "Assess likelihood and impact"
+      - "Provide mitigation strategies"
+      - "Suggest contingency plans"
+    token_budget_hint: 900
+    options: []

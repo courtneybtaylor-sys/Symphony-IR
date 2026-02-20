@@ -1,0 +1,70 @@
+template_id: "code_review"
+name: "Code Review Assistant"
+description: "Guided code review workflow with focused analysis paths"
+
+nodes:
+  start:
+    summary: "Starting code review"
+    role: "reviewer"
+    intent: "Review code quality in {component}"
+    phase: "REVIEW"
+    priority: 5
+    context_refs:
+      - "file:{component}"
+    constraints: []
+    token_budget_hint: 800
+    options:
+      - id: "A"
+        label: "Focus on bugs"
+        description: "Look for potential bugs and logic errors"
+        next_node_id: "bugs"
+      - id: "B"
+        label: "Focus on style"
+        description: "Check code style and conventions"
+        next_node_id: "style"
+      - id: "C"
+        label: "Focus on performance"
+        description: "Identify performance bottlenecks"
+        next_node_id: "performance"
+
+  bugs:
+    summary: "Checking for bugs"
+    role: "reviewer"
+    intent: "Identify potential bugs and logic errors in {component}"
+    phase: "REVIEW"
+    priority: 8
+    context_refs:
+      - "file:{component}"
+    constraints:
+      - "List issues with severity levels (critical, high, medium, low)"
+      - "Include reproduction steps for each bug"
+    token_budget_hint: 1000
+    options: []
+
+  style:
+    summary: "Checking code style"
+    role: "reviewer"
+    intent: "Check code style consistency and conventions in {component}"
+    phase: "REVIEW"
+    priority: 5
+    context_refs:
+      - "file:{component}"
+    constraints:
+      - "List style violations with suggested fixes"
+      - "Reference relevant style guide rules"
+    token_budget_hint: 800
+    options: []
+
+  performance:
+    summary: "Analyzing performance"
+    role: "reviewer"
+    intent: "Identify performance bottlenecks and optimization opportunities in {component}"
+    phase: "REVIEW"
+    priority: 7
+    context_refs:
+      - "file:{component}"
+    constraints:
+      - "Prioritize by estimated impact"
+      - "Include optimization suggestions with complexity estimates"
+    token_budget_hint: 1200
+    options: []
