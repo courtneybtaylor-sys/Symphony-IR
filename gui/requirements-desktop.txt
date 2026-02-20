@@ -2,6 +2,9 @@
 PyQt6==6.6.1
 PyQt6-Charts==6.6.0
 
+# Security
+keyring==24.3.0  # Secure credential storage (Windows Credential Manager, etc.)
+
 # Existing dependencies
 streamlit==1.28.1
 anthropic==0.7.0
