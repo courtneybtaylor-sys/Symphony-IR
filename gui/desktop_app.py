@@ -1,656 +1,833 @@
 """
 Symphony-IR Desktop Application
-Modern PyQt6 GUI for Windows, macOS, and Linux
-No terminal commands needed - everything through GUI
+Full GUI - no terminal needed. Secure by default.
+
+Security features (all on by default):
+  1. API keys → Windows Credential Manager (never plaintext)
+  2. Sessions → auto-redacted before saving/displaying
+  3. Errors  → plain English with actionable suggestions
 """
 
 import sys
 import json
 import subprocess
-import threading
 import os
+import logging
+import webbrowser
 from pathlib import Path
-from datetime import datetime
-from typing import Optional, Dict, List
+from typing import Dict, Optional
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTabWidget, QLabel, QLineEdit, QTextEdit, QPushButton, QComboBox,
-    QSpinBox, QCheckBox, QFileDialog, QMessageBox, QTableWidget, QTableWidgetItem,
-    QProgressBar, QStatusBar, QMenuBar, QMenu, QDialog, QListWidget, QListWidgetItem,
-    QSplitter, QGroupBox, QFormLayout, QHeaderView
+    QSpinBox, QCheckBox, QFileDialog, QMessageBox, QTableWidget,
+    QTableWidgetItem, QProgressBar, QGroupBox, QFormLayout, QHeaderView,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSettings
-from PyQt6.QtGui import QIcon, QColor, QFont, QAction
-from PyQt6.QtCharts import QChart, QChartView, QBarSeries, QBarSet, QBarCategoryAxis
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
+from PyQt6.QtGui import QAction, QFont
 
+from secure_credentials import CredentialManager, SecureConfig, get_secure_config
+from session_redaction import SessionRedactor
+from user_friendly_errors import (
+    ErrorHandler, ErrorTranslator, UserFriendlyError,
+    get_api_key_error,
+)
+
+logger = logging.getLogger(__name__)
+PROJECT_ROOT = Path.home() / "Symphony-IR"
+ORCH_DIR     = PROJECT_ROOT / "ai-orchestrator"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Background worker
+# ─────────────────────────────────────────────────────────────────────────────
 
 class OrchestratorWorker(QThread):
-    """Run orchestrator tasks in background thread"""
+    """Run orchestrator subcommands in a background thread."""
+
     progress = pyqtSignal(str)
     finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
+    error    = pyqtSignal(dict)   # emits UserFriendlyError.to_dict()
 
-    def __init__(self, task: str, command_type: str = "run", **kwargs):
+    def __init__(self, command_type: str, config: SecureConfig, **kwargs):
         super().__init__()
-        self.task = task
         self.command_type = command_type
-        self.kwargs = kwargs
+        self.config       = config
+        self.kwargs       = kwargs
+
+    def _build_cmd(self) -> list:
+        root = str(PROJECT_ROOT)
+        base = [sys.executable, "orchestrator.py"]
+
+        if self.command_type == "run":
+            return base + ["run", self.kwargs["task"], "--project", root]
+
+        if self.command_type == "flow":
+            cmd = base + ["flow", "--template", self.kwargs["template"],
+                          "--project", root]
+            for k, v in self.kwargs.get("variables", {}).items():
+                cmd += ["--var", f"{k}={v}"]
+            return cmd
+
+        if self.command_type == "status":
+            return base + ["status", "--project", root]
+
+        if self.command_type == "history":
+            return base + ["history", "--limit", "20", "--project", root]
+
+        if self.command_type == "flow-list":
+            return base + ["flow-list"]
+
+        raise ValueError(f"Unknown command_type: {self.command_type}")
+
+    def _env(self) -> dict:
+        env = os.environ.copy()
+        api_key = self.config.get_api_key()
+        if api_key:
+            env["ANTHROPIC_API_KEY"] = api_key
+        env["OLLAMA_BASE_URL"] = self.config.get_ollama_url()
+        return env
 
     def run(self):
         try:
-            project_root = Path.home() / "Symphony-IR"
-            os_cmd = []
+            cmd = self._build_cmd()
+        except ValueError as exc:
+            self.error.emit(ErrorHandler.handle_error(exc, "build_cmd").to_dict())
+            return
 
-            if self.command_type == "run":
-                os_cmd = [
-                    sys.executable, "-m", "orchestrator.orchestrator",
-                    "run", self.task,
-                    "--project", str(project_root)
-                ]
+        self.progress.emit("Starting…")
 
-            elif self.command_type == "flow":
-                template = self.kwargs.get("template", "code_review")
-                variables = self.kwargs.get("variables", {})
-                os_cmd = [
-                    sys.executable, "-m", "orchestrator.orchestrator",
-                    "flow", "--template", template,
-                    "--project", str(project_root)
-                ]
-                for key, val in variables.items():
-                    os_cmd.extend(["--var", f"{key}={val}"])
-
-            elif self.command_type == "status":
-                os_cmd = [
-                    sys.executable, "-m", "orchestrator.orchestrator",
-                    "status", "--project", str(project_root)
-                ]
-
-            elif self.command_type == "history":
-                os_cmd = [
-                    sys.executable, "-m", "orchestrator.orchestrator",
-                    "history", "--limit", "20",
-                    "--project", str(project_root)
-                ]
-
-            self.progress.emit("Starting orchestrator...")
-            process = subprocess.Popen(
-                os_cmd,
-                cwd=str(project_root / "ai-orchestrator"),
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                cwd=str(ORCH_DIR),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                env=self._env(),
             )
+            stdout, stderr = proc.communicate()
+        except FileNotFoundError:
+            err = UserFriendlyError(
+                title="Orchestrator Not Found",
+                message="orchestrator.py could not be found in the ai-orchestrator directory.",
+                suggestions=[
+                    "Make sure the project was installed correctly",
+                    f"Expected: {ORCH_DIR / 'orchestrator.py'}",
+                    "Try running the installer again (windows/install.ps1)",
+                ],
+                help_link="https://github.com/courtneybtaylor-sys/Symphony-IR#installation",
+            )
+            self.error.emit(err.to_dict())
+            return
+        except Exception as exc:
+            self.error.emit(ErrorHandler.handle_error(exc, "subprocess").to_dict())
+            return
 
-            stdout, stderr = process.communicate()
+        if proc.returncode != 0:
+            combined = (stderr or stdout or "").strip()
+            self.error.emit(ErrorTranslator.translate(combined).to_dict())
+            return
 
-            if process.returncode != 0:
-                self.error.emit(f"Error: {stderr}")
-                return
+        # Redact output before returning to UI
+        clean = SessionRedactor.redact_text(stdout)
+        self.finished.emit({"success": True, "output": clean, "type": self.command_type})
 
-            self.finished.emit({
-                "success": True,
-                "output": stdout,
-                "command_type": self.command_type
-            })
 
-        except Exception as e:
-            self.error.emit(str(e))
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared helpers
+# ─────────────────────────────────────────────────────────────────────────────
 
+def show_error(parent, err_dict: dict):
+    """Display a user-friendly error dialog."""
+    body = err_dict.get("message", "An error occurred.")
+    suggestions = err_dict.get("suggestions", [])
+    if suggestions:
+        body += "\n\nWhat you can do:\n" + "\n".join(
+            f"  {i+1}. {s}" for i, s in enumerate(suggestions)
+        )
+    link = err_dict.get("help_link", "")
+    if link:
+        body += f"\n\nLearn more: {link}"
+    QMessageBox.critical(parent, err_dict.get("title", "Error"), body)
+
+
+def _output_box() -> QTextEdit:
+    tb = QTextEdit()
+    tb.setReadOnly(True)
+    tb.setFont(QFont("Consolas", 9))
+    return tb
+
+
+def _run_btn(label: str, color: str = "#4CAF50") -> QPushButton:
+    btn = QPushButton(label)
+    btn.setStyleSheet(
+        f"QPushButton{{background:{color};color:white;font-weight:bold;padding:9px 18px;}}"
+        f"QPushButton:hover{{background:{color}cc;}}"
+        f"QPushButton:disabled{{background:#aaa;}}"
+    )
+    return btn
+
+
+def _spin(lo: int, hi: int, val: int, suffix: str = "") -> QSpinBox:
+    s = QSpinBox()
+    s.setRange(lo, hi)
+    s.setValue(val)
+    if suffix:
+        s.setSuffix(suffix)
+    return s
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 1 – Orchestrator
+# ─────────────────────────────────────────────────────────────────────────────
 
 class OrchestratorTab(QWidget):
-    """Main orchestration tab"""
-
-    def __init__(self):
+    def __init__(self, config: SecureConfig):
         super().__init__()
-        self.init_ui()
-        self.worker = None
+        self.config = config
+        self.worker: Optional[OrchestratorWorker] = None
+        self._build()
 
-    def init_ui(self):
-        layout = QVBoxLayout()
+    def _build(self):
+        layout = QVBoxLayout(self)
 
-        # Task input section
-        input_group = QGroupBox("Task Description")
-        input_layout = QFormLayout()
-
+        grp = QGroupBox("Task Description")
+        form = QFormLayout(grp)
         self.task_input = QTextEdit()
         self.task_input.setPlaceholderText(
-            "Enter your task description here...\n\n"
+            "Describe what you want the AI agents to do…\n\n"
             "Examples:\n"
-            "- Review authentication system for security vulnerabilities\n"
-            "- Design a REST API for a todo application\n"
-            "- Refactor the payment processing module"
+            "  • Review the authentication module for security issues\n"
+            "  • Design a REST API for a todo application\n"
+            "  • Refactor the payment service for better testability"
         )
-        self.task_input.setMinimumHeight(150)
-
-        input_layout.addRow("Task:", self.task_input)
-
-        # Project root
-        project_layout = QHBoxLayout()
-        self.project_path = QLineEdit()
-        self.project_path.setText(str(Path.home() / "Symphony-IR"))
-        browse_btn = QPushButton("Browse")
-        browse_btn.clicked.connect(self.browse_project)
-        project_layout.addWidget(self.project_path)
-        project_layout.addWidget(browse_btn)
-
-        input_layout.addRow("Project:", project_layout)
-
-        # Options
-        self.dry_run = QCheckBox("Dry run (show plan without executing)")
+        self.task_input.setMinimumHeight(130)
+        form.addRow("Task:", self.task_input)
+        self.dry_run = QCheckBox("Dry run  (show plan only, no execution)")
         self.verbose = QCheckBox("Verbose output")
-        input_layout.addRow(self.dry_run)
-        input_layout.addRow(self.verbose)
+        form.addRow(self.dry_run)
+        form.addRow(self.verbose)
+        layout.addWidget(grp)
 
-        input_group.setLayout(input_layout)
-        layout.addWidget(input_group)
+        row = QHBoxLayout()
+        self.run_btn = _run_btn("▶  Run Orchestrator")
+        self.run_btn.clicked.connect(self._run)
+        row.addWidget(self.run_btn)
+        row.addStretch()
+        layout.addLayout(row)
 
-        # Run button
-        run_layout = QHBoxLayout()
-        self.run_btn = QPushButton("▶ Run Orchestrator")
-        self.run_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; padding: 10px; }"
-        )
-        self.run_btn.clicked.connect(self.run_orchestrator)
-        run_layout.addWidget(self.run_btn)
-        run_layout.addStretch()
-        layout.addLayout(run_layout)
-
-        # Progress bar
         self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
         self.progress.setVisible(False)
         layout.addWidget(self.progress)
 
-        # Output section
-        output_group = QGroupBox("Output")
-        output_layout = QVBoxLayout()
-        self.output_text = QTextEdit()
-        self.output_text.setReadOnly(True)
-        output_layout.addWidget(self.output_text)
-        output_group.setLayout(output_layout)
-        layout.addWidget(output_group)
+        out_grp = QGroupBox("Output  (auto-redacted)")
+        out_layout = QVBoxLayout(out_grp)
+        self.output = _output_box()
+        out_layout.addWidget(self.output)
+        layout.addWidget(out_grp)
 
-        self.setLayout(layout)
-
-    def browse_project(self):
-        path = QFileDialog.getExistingDirectory(self, "Select Project Directory")
-        if path:
-            self.project_path.setText(path)
-
-    def run_orchestrator(self):
+    def _run(self):
         task = self.task_input.toPlainText().strip()
         if not task:
-            QMessageBox.warning(self, "Error", "Please enter a task description")
+            QMessageBox.warning(self, "No Task", "Please enter a task description.")
             return
 
-        self.output_text.clear()
-        self.progress.setVisible(True)
-        self.run_btn.setEnabled(False)
+        provider = self.config.get("provider", "Claude (Cloud)")
+        if "Claude" in provider and not self.config.get_api_key():
+            show_error(self, get_api_key_error().to_dict())
+            return
 
-        self.worker = OrchestratorWorker(task)
-        self.worker.progress.connect(self.on_progress)
-        self.worker.finished.connect(self.on_finished)
-        self.worker.error.connect(self.on_error)
+        self.output.clear()
+        self._busy(True)
+        self.worker = OrchestratorWorker("run", self.config, task=task)
+        self.worker.progress.connect(lambda m: self.output.append(f"[•] {m}"))
+        self.worker.finished.connect(self._done)
+        self.worker.error.connect(self._err)
         self.worker.start()
 
-    def on_progress(self, message: str):
-        self.output_text.append(f"[*] {message}")
+    def _done(self, result: dict):
+        self._busy(False)
+        self.output.append("\n" + "─" * 60 + "\n✅  Complete\n" + "─" * 60 + "\n")
+        self.output.append(result["output"])
 
-    def on_finished(self, result: dict):
-        self.output_text.append(f"\n{'='*60}\n✅ Execution Complete\n{'='*60}\n")
-        self.output_text.append(result["output"])
-        self.progress.setVisible(False)
-        self.run_btn.setEnabled(True)
+    def _err(self, err: dict):
+        self._busy(False)
+        show_error(self, err)
 
-    def on_error(self, error: str):
-        self.output_text.append(f"\n❌ Error: {error}")
-        self.progress.setVisible(False)
-        self.run_btn.setEnabled(True)
+    def _busy(self, active: bool):
+        self.run_btn.setEnabled(not active)
+        self.progress.setVisible(active)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 2 – Symphony Flow
+# ─────────────────────────────────────────────────────────────────────────────
+
+_TEMPLATES = {
+    "code_review":      ("Code Review",       "Guided analysis: bugs, style, or performance"),
+    "refactor_code":    ("Refactor Code",     "Design improvements, quick fixes, or dependencies"),
+    "new_feature":      ("New Feature",       "Architecture, checklist, or risk analysis"),
+    "api_design":       ("API Design",        "REST, GraphQL, or hybrid API specification"),
+    "database_schema":  ("Database Schema",   "SQL, NoSQL, or hybrid schema design"),
+    "testing_strategy": ("Testing Strategy",  "Unit, integration, performance, or security"),
+    "documentation":    ("Documentation",     "User guides, developer docs, or architecture"),
+}
 
 
 class FlowTab(QWidget):
-    """Symphony Flow workflow tab"""
-
-    def __init__(self):
+    def __init__(self, config: SecureConfig):
         super().__init__()
-        self.init_ui()
-        self.worker = None
+        self.config = config
+        self.worker: Optional[OrchestratorWorker] = None
+        self._build()
 
-    def init_ui(self):
-        layout = QVBoxLayout()
+    def _build(self):
+        layout = QVBoxLayout(self)
 
-        # Template selection
-        template_group = QGroupBox("Select Workflow Template")
-        template_layout = QFormLayout()
+        grp = QGroupBox("Workflow Template")
+        form = QFormLayout(grp)
+        self.tmpl = QComboBox()
+        for key, (name, _) in _TEMPLATES.items():
+            self.tmpl.addItem(f"{name}  ({key})", userData=key)
+        self.tmpl.currentIndexChanged.connect(self._update_desc)
+        self.desc_lbl = QLabel()
+        self.desc_lbl.setWordWrap(True)
+        self.desc_lbl.setStyleSheet("color:#555;font-style:italic;")
+        form.addRow("Template:", self.tmpl)
+        form.addRow("",         self.desc_lbl)
+        layout.addWidget(grp)
 
-        self.template_combo = QComboBox()
-        self.template_combo.addItems([
-            "code_review - Code quality review",
-            "refactor_code - Refactoring guidance",
-            "new_feature - Feature planning",
-            "api_design - API design",
-            "database_schema - Database design",
-            "testing_strategy - Testing plans",
-            "documentation - Documentation planning"
-        ])
-        self.template_combo.currentTextChanged.connect(self.on_template_changed)
-
-        template_layout.addRow("Template:", self.template_combo)
-
-        # Template description
-        self.template_desc = QTextEdit()
-        self.template_desc.setReadOnly(True)
-        self.template_desc.setMaximumHeight(100)
-        template_layout.addRow("Description:", self.template_desc)
-
-        template_group.setLayout(template_layout)
-        layout.addWidget(template_group)
-
-        # Variables section
-        var_group = QGroupBox("Template Variables")
-        var_layout = QFormLayout()
-
+        var_grp = QGroupBox("Variables  (optional)")
+        var_form = QFormLayout(var_grp)
         self.var_input = QLineEdit()
-        self.var_input.setPlaceholderText("e.g., component=auth.py or api_name=user-service")
-        var_layout.addRow("Variable:", self.var_input)
-
-        var_group.setLayout(var_layout)
-        layout.addWidget(var_group)
-
-        # Run button
-        run_layout = QHBoxLayout()
-        self.run_flow_btn = QPushButton("▶ Start Workflow")
-        self.run_flow_btn.setStyleSheet(
-            "QPushButton { background-color: #2196F3; color: white; font-weight: bold; padding: 10px; }"
+        self.var_input.setPlaceholderText(
+            "key=value  (comma-separated)   e.g.  component=auth.py, api_name=orders"
         )
-        self.run_flow_btn.clicked.connect(self.run_flow)
-        run_layout.addWidget(self.run_flow_btn)
-        run_layout.addStretch()
-        layout.addLayout(run_layout)
+        var_form.addRow("Variables:", self.var_input)
+        layout.addWidget(var_grp)
 
-        # Progress
-        self.flow_progress = QProgressBar()
-        self.flow_progress.setVisible(False)
-        layout.addWidget(self.flow_progress)
+        row = QHBoxLayout()
+        self.run_btn = _run_btn("▶  Start Workflow", color="#2196F3")
+        self.run_btn.clicked.connect(self._run)
+        row.addWidget(self.run_btn)
+        row.addStretch()
+        layout.addLayout(row)
 
-        # Output
-        output_group = QGroupBox("Workflow Progress")
-        output_layout = QVBoxLayout()
-        self.flow_output = QTextEdit()
-        self.flow_output.setReadOnly(True)
-        output_layout.addWidget(self.flow_output)
-        output_group.setLayout(output_layout)
-        layout.addWidget(output_group)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(False)
+        layout.addWidget(self.progress)
 
-        self.setLayout(layout)
-        self.on_template_changed()
+        out_grp = QGroupBox("Workflow Output  (auto-redacted)")
+        out_layout = QVBoxLayout(out_grp)
+        self.output = _output_box()
+        out_layout.addWidget(self.output)
+        layout.addWidget(out_grp)
 
-    def on_template_changed(self):
-        descriptions = {
-            "code_review": "Review code quality with focused analysis paths (bugs, style, performance)",
-            "refactor_code": "Get structured refactoring guidance (design improvements, quick fixes)",
-            "new_feature": "Plan and implement new features with architecture and risk analysis",
-            "api_design": "Design robust APIs (REST, GraphQL, hybrid approaches)",
-            "database_schema": "Design database schemas (SQL, NoSQL, hybrid databases)",
-            "testing_strategy": "Create comprehensive testing plans (unit, integration, performance)",
-            "documentation": "Plan documentation (user guides, API docs, architecture)"
-        }
+        self._update_desc()
 
-        current = self.template_combo.currentText().split(" - ")[0]
-        self.template_desc.setText(descriptions.get(current, ""))
+    def _update_desc(self):
+        key = self.tmpl.currentData()
+        _, desc = _TEMPLATES.get(key, ("", ""))
+        self.desc_lbl.setText(desc)
 
-    def run_flow(self):
-        template = self.template_combo.currentText().split(" - ")[0]
-        variables_str = self.var_input.text().strip()
+    def _run(self):
+        template = self.tmpl.currentData()
+        variables: Dict[str, str] = {}
+        raw = self.var_input.text().strip()
+        if raw:
+            for part in raw.split(","):
+                part = part.strip()
+                if "=" not in part:
+                    QMessageBox.warning(
+                        self, "Invalid Variable",
+                        f"Variables must be  key=value\n\nGot: {part!r}"
+                    )
+                    return
+                k, v = part.split("=", 1)
+                variables[k.strip()] = v.strip()
 
-        variables = {}
-        if variables_str:
-            for var in variables_str.split(","):
-                if "=" in var:
-                    key, val = var.split("=", 1)
-                    variables[key.strip()] = val.strip()
+        provider = self.config.get("provider", "Claude (Cloud)")
+        if "Claude" in provider and not self.config.get_api_key():
+            show_error(self, get_api_key_error().to_dict())
+            return
 
-        self.flow_output.clear()
-        self.flow_progress.setVisible(True)
-        self.run_flow_btn.setEnabled(False)
-
+        self.output.clear()
+        self._busy(True)
         self.worker = OrchestratorWorker(
-            "workflow",
-            command_type="flow",
-            template=template,
-            variables=variables
+            "flow", self.config, template=template, variables=variables
         )
-        self.worker.progress.connect(self.on_progress)
-        self.worker.finished.connect(self.on_finished)
-        self.worker.error.connect(self.on_error)
+        self.worker.progress.connect(lambda m: self.output.append(f"[•] {m}"))
+        self.worker.finished.connect(self._done)
+        self.worker.error.connect(self._err)
         self.worker.start()
 
-    def on_progress(self, message: str):
-        self.flow_output.append(f"[*] {message}")
+    def _done(self, result: dict):
+        self._busy(False)
+        self.output.append("\n" + "─" * 60 + "\n✅  Workflow Complete\n" + "─" * 60 + "\n")
+        self.output.append(result["output"])
 
-    def on_finished(self, result: dict):
-        self.flow_output.append("\n✅ Workflow Complete!\n")
-        self.flow_output.append(result["output"])
-        self.flow_progress.setVisible(False)
-        self.run_flow_btn.setEnabled(True)
+    def _err(self, err: dict):
+        self._busy(False)
+        show_error(self, err)
 
-    def on_error(self, error: str):
-        self.flow_output.append(f"\n❌ Error: {error}")
-        self.flow_progress.setVisible(False)
-        self.run_flow_btn.setEnabled(True)
+    def _busy(self, active: bool):
+        self.run_btn.setEnabled(not active)
+        self.progress.setVisible(active)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 3 – History  (auto-redacted + sanitised export)
+# ─────────────────────────────────────────────────────────────────────────────
 
 class HistoryTab(QWidget):
-    """View execution history"""
-
     def __init__(self):
         super().__init__()
-        self.init_ui()
-        self.load_history()
+        self._raw: list = []   # raw session dicts for export
+        self._build()
+        self.reload()
 
-    def init_ui(self):
-        layout = QVBoxLayout()
+    def _build(self):
+        layout = QVBoxLayout(self)
 
-        # Toolbar
-        toolbar_layout = QHBoxLayout()
-        refresh_btn = QPushButton("🔄 Refresh")
-        refresh_btn.clicked.connect(self.load_history)
-        toolbar_layout.addWidget(refresh_btn)
-        toolbar_layout.addStretch()
-        layout.addLayout(toolbar_layout)
+        bar = QHBoxLayout()
+        reload_btn = QPushButton("🔄  Refresh")
+        reload_btn.clicked.connect(self.reload)
+        export_btn = _run_btn("💾  Export Sanitised", color="#607D8B")
+        export_btn.clicked.connect(self._export)
+        bar.addWidget(reload_btn)
+        bar.addWidget(export_btn)
+        bar.addStretch()
+        layout.addLayout(bar)
 
-        # History table
-        self.history_table = QTableWidget()
-        self.history_table.setColumnCount(5)
-        self.history_table.setHorizontalHeaderLabels(
-            ["Timestamp", "Task", "Status", "Run ID", "Details"]
+        self.table = QTableWidget(0, 5)
+        self.table.setHorizontalHeaderLabels(
+            ["Timestamp", "Task / Summary", "Status", "Run ID", "Confidence"]
         )
-        self.history_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.history_table)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.currentCellChanged.connect(self._show_detail)
+        layout.addWidget(self.table)
 
-        # Details section
-        details_group = QGroupBox("Details")
-        details_layout = QVBoxLayout()
-        self.details_text = QTextEdit()
-        self.details_text.setReadOnly(True)
-        self.details_text.setMaximumHeight(150)
-        details_layout.addWidget(self.details_text)
-        details_group.setLayout(details_layout)
-        layout.addWidget(details_group)
+        det_grp = QGroupBox("Details  (auto-redacted)")
+        det_layout = QVBoxLayout(det_grp)
+        self.details = _output_box()
+        self.details.setMaximumHeight(160)
+        det_layout.addWidget(self.details)
+        layout.addWidget(det_grp)
 
-        self.setLayout(layout)
+    def _runs_dir(self) -> Path:
+        return PROJECT_ROOT / ".orchestrator" / "runs"
 
-    def load_history(self):
-        """Load execution history from .orchestrator/runs/"""
+    def reload(self):
+        self._raw.clear()
+        self.table.setRowCount(0)
+        self.details.clear()
+
+        runs_dir = self._runs_dir()
+        if not runs_dir.exists():
+            return
+
+        files = sorted(
+            runs_dir.glob("*.json"),
+            key=lambda f: f.stat().st_mtime,
+            reverse=True,
+        )[:30]
+
+        for row, fpath in enumerate(files):
+            try:
+                raw = json.loads(fpath.read_text())
+            except Exception:
+                continue
+            self._raw.append(raw)
+
+            r    = SessionRedactor.redact_session(raw)
+            ts   = str(r.get("metadata", {}).get("timestamp", fpath.stem))
+            task = str(r.get("task", "—"))[:60]
+            ok   = r.get("success", False)
+            rid  = str(r.get("run_id", "—"))[:14]
+            conf = r.get("confidence", None)
+            conf_s = f"{conf:.0%}" if isinstance(conf, float) else "—"
+
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(ts))
+            self.table.setItem(row, 1, QTableWidgetItem(task))
+            status_item = QTableWidgetItem("✅" if ok else "❌")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 2, status_item)
+            self.table.setItem(row, 3, QTableWidgetItem(rid))
+            self.table.setItem(row, 4, QTableWidgetItem(conf_s))
+
+    def _show_detail(self, row: int, *_):
+        if 0 <= row < len(self._raw):
+            redacted = SessionRedactor.redact_session(self._raw[row])
+            self.details.setPlainText(json.dumps(redacted, indent=2))
+
+    def _export(self):
+        if not self._raw:
+            QMessageBox.information(self, "No Sessions", "No run history found.")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Sanitised Sessions",
+            str(Path.home() / "Desktop" / "symphony-sessions-sanitised.json"),
+            "JSON Files (*.json)",
+        )
+        if not path:
+            return
+
+        export = {
+            "exported_by": "Symphony-IR",
+            "redaction_level": "BASIC",
+            "sessions": [SessionRedactor.redact_session(s) for s in self._raw],
+        }
         try:
-            runs_dir = Path.home() / "Symphony-IR" / ".orchestrator" / "runs"
-            if not runs_dir.exists():
-                self.history_table.setRowCount(0)
-                return
+            Path(path).write_text(json.dumps(export, indent=2))
+            QMessageBox.information(
+                self, "✅  Export Complete",
+                f"Saved {len(self._raw)} sessions (redacted) to:\n{path}"
+            )
+        except Exception as exc:
+            show_error(self, ErrorHandler.handle_error(exc, "export").to_dict())
 
-            # Get recent run files
-            run_files = sorted(runs_dir.glob("*.json"), key=lambda x: x.stat().st_mtime, reverse=True)[:20]
 
-            self.history_table.setRowCount(len(run_files))
-
-            for row, run_file in enumerate(run_files):
-                try:
-                    with open(run_file) as f:
-                        data = json.load(f)
-
-                    timestamp = data.get("metadata", {}).get("timestamp", "N/A")
-                    task = data.get("task", "N/A")[:50]
-                    status = "✅" if data.get("success", False) else "❌"
-                    run_id = data.get("run_id", "N/A")[:12]
-
-                    self.history_table.setItem(row, 0, QTableWidgetItem(timestamp))
-                    self.history_table.setItem(row, 1, QTableWidgetItem(task))
-                    self.history_table.setItem(row, 2, QTableWidgetItem(status))
-                    self.history_table.setItem(row, 3, QTableWidgetItem(run_id))
-                    self.history_table.setItem(row, 4, QTableWidgetItem("📄 View"))
-
-                except Exception as e:
-                    pass
-
-        except Exception as e:
-            self.details_text.setText(f"Error loading history: {str(e)}")
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Tab 4 – Settings  (Credential Manager integration)
+# ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsTab(QWidget):
-    """Configuration and settings"""
-
-    def __init__(self):
+    def __init__(self, config: SecureConfig):
         super().__init__()
-        self.init_ui()
-        self.load_settings()
+        self.config = config
+        self._showing_key = False
+        self._build()
+        self._load()
 
-    def init_ui(self):
-        layout = QVBoxLayout()
+    def _build(self):
+        layout = QVBoxLayout(self)
 
-        # API Configuration
-        api_group = QGroupBox("API Configuration")
-        api_layout = QFormLayout()
+        # Provider & Model
+        prov_grp = QGroupBox("🤖  AI Provider & Model")
+        prov_form = QFormLayout(prov_grp)
+        self.provider = QComboBox()
+        self.provider.addItems(["Claude (Cloud)", "Ollama (Local — Free)", "OpenAI"])
+        self.provider.currentTextChanged.connect(self._provider_changed)
+        self.model = QComboBox()
+        self.model.addItems([
+            "claude-sonnet-4-20250514  (Recommended)",
+            "claude-opus-4-5",
+            "claude-haiku-4-5",
+            "mistral  (Ollama)",
+            "llama2  (Ollama)",
+            "neural-chat  (Ollama)",
+            "dolphin-mixtral  (Ollama)",
+        ])
+        prov_form.addRow("Provider:", self.provider)
+        prov_form.addRow("Model:",    self.model)
+        layout.addWidget(prov_grp)
 
-        self.provider_combo = QComboBox()
-        self.provider_combo.addItems(["Claude (Cloud)", "Ollama (Local)", "OpenAI"])
-        api_layout.addRow("AI Model Provider:", self.provider_combo)
+        # Credentials
+        cred_grp = QGroupBox("🔐  Credentials  (stored in system Credential Manager)")
+        cred_form = QFormLayout(cred_grp)
 
+        key_row = QHBoxLayout()
         self.api_key = QLineEdit()
         self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.api_key.setPlaceholderText("sk-... (leave blank for Ollama)")
-        api_layout.addRow("API Key:", self.api_key)
+        self.api_key.setPlaceholderText("sk-ant-…  (encrypted — never saved to disk)")
+        toggle = QPushButton("👁")
+        toggle.setMaximumWidth(36)
+        toggle.setToolTip("Show / hide key")
+        toggle.clicked.connect(self._toggle_key)
+        key_row.addWidget(self.api_key)
+        key_row.addWidget(toggle)
+        cred_form.addRow("Anthropic API Key:", key_row)
+
+        avail = CredentialManager.is_available()
+        sec_lbl = QLabel(
+            "🔒  Encrypted via keyring — ✅ available" if avail
+            else "⚠️  keyring not installed.  Run:  pip install keyring"
+        )
+        sec_lbl.setStyleSheet("color:#388E3C;" if avail else "color:#E65100;")
+        sec_lbl.setWordWrap(True)
+        cred_form.addRow("", sec_lbl)
 
         self.ollama_url = QLineEdit()
-        self.ollama_url.setText("http://localhost:11434")
-        api_layout.addRow("Ollama URL:", self.ollama_url)
+        self.ollama_url.setPlaceholderText("http://localhost:11434")
+        cred_form.addRow("Ollama URL:", self.ollama_url)
+        layout.addWidget(cred_grp)
 
-        api_group.setLayout(api_layout)
-        layout.addWidget(api_group)
-
-        # Model Selection
-        model_group = QGroupBox("Model Selection")
-        model_layout = QFormLayout()
-
-        self.model_combo = QComboBox()
-        self.model_combo.addItems([
-            "Claude Sonnet 4 (Recommended)",
-            "Claude 3.5 Opus",
-            "Llama 2 (Local)",
-            "Mistral (Local - Recommended)",
-            "Dolphin Mixtral (Local)"
-        ])
-        model_layout.addRow("Model:", self.model_combo)
-
-        model_group.setLayout(model_layout)
-        layout.addWidget(model_group)
-
-        # Orchestrator Settings
-        settings_group = QGroupBox("Orchestrator Settings")
-        settings_layout = QFormLayout()
-
-        self.max_phases = QSpinBox()
-        self.max_phases.setMinimum(1)
-        self.max_phases.setMaximum(100)
-        self.max_phases.setValue(10)
-        settings_layout.addRow("Max Phases:", self.max_phases)
-
-        self.confidence_threshold = QSpinBox()
-        self.confidence_threshold.setMinimum(0)
-        self.confidence_threshold.setMaximum(100)
-        self.confidence_threshold.setValue(85)
-        self.confidence_threshold.setSuffix("%")
-        settings_layout.addRow("Confidence Threshold:", self.confidence_threshold)
-
-        self.parallel_execution = QCheckBox("Enable parallel execution")
-        self.parallel_execution.setChecked(True)
-        settings_layout.addRow(self.parallel_execution)
-
-        settings_group.setLayout(settings_layout)
-        layout.addWidget(settings_group)
+        # Tuning
+        orch_grp = QGroupBox("⚙️  Orchestrator Tuning")
+        orch_form = QFormLayout(orch_grp)
+        self.max_phases  = _spin(1, 100, 10)
+        self.confidence  = _spin(0, 100, 85, " %")
+        self.parallel    = QCheckBox("Enable parallel agent execution")
+        self.parallel.setChecked(True)
+        orch_form.addRow("Max Phases:",           self.max_phases)
+        orch_form.addRow("Confidence Threshold:", self.confidence)
+        orch_form.addRow(self.parallel)
+        layout.addWidget(orch_grp)
 
         # Buttons
-        button_layout = QHBoxLayout()
-        save_btn = QPushButton("💾 Save Settings")
-        save_btn.clicked.connect(self.save_settings)
-        reset_btn = QPushButton("⚙️ Reset to Defaults")
-        reset_btn.clicked.connect(self.reset_settings)
-
-        button_layout.addWidget(save_btn)
-        button_layout.addWidget(reset_btn)
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-
+        btn_row = QHBoxLayout()
+        save_btn = _run_btn("💾  Save Settings",    "#4CAF50")
+        mig_btn  = _run_btn("🔄  Migrate Old Keys", "#FF9800")
+        del_btn  = _run_btn("🗑  Delete Key",        "#F44336")
+        save_btn.clicked.connect(self._save)
+        mig_btn.clicked.connect(self._migrate)
+        del_btn.clicked.connect(self._delete_key)
+        btn_row.addWidget(save_btn)
+        btn_row.addWidget(mig_btn)
+        btn_row.addWidget(del_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
         layout.addStretch()
-        self.setLayout(layout)
 
-    def load_settings(self):
-        settings = QSettings("Symphony-IR", "Orchestra")
-        self.provider_combo.setCurrentText(
-            settings.value("provider", "Claude (Cloud)")
-        )
-        self.api_key.setText(settings.value("api_key", ""))
-        self.ollama_url.setText(settings.value("ollama_url", "http://localhost:11434"))
-        self.model_combo.setCurrentText(
-            settings.value("model", "Claude Sonnet 4 (Recommended)")
+    # ── slots ─────────────────────────────────────────────────────────────────
+
+    def _toggle_key(self):
+        self._showing_key = not self._showing_key
+        self.api_key.setEchoMode(
+            QLineEdit.EchoMode.Normal if self._showing_key else QLineEdit.EchoMode.Password
         )
 
-    def save_settings(self):
-        settings = QSettings("Symphony-IR", "Orchestra")
-        settings.setValue("provider", self.provider_combo.currentText())
-        settings.setValue("api_key", self.api_key.text())
-        settings.setValue("ollama_url", self.ollama_url.text())
-        settings.setValue("model", self.model_combo.currentText())
+    def _provider_changed(self, text: str):
+        is_ollama = "Ollama" in text
+        self.api_key.setEnabled(not is_ollama)
+        self.api_key.setPlaceholderText(
+            "Not needed for Ollama" if is_ollama else "sk-ant-…  (encrypted)"
+        )
 
-        QMessageBox.information(self, "Success", "Settings saved successfully!")
+    def _load(self):
+        qs = QSettings("Symphony-IR", "Desktop")
+        self.provider.setCurrentText(qs.value("provider",    "Claude (Cloud)"))
+        self.model.setCurrentIndex(qs.value("model_idx",     0, type=int))
+        self.max_phases.setValue(qs.value("max_phases",      10, type=int))
+        self.confidence.setValue(qs.value("confidence",      85, type=int))
+        self.parallel.setChecked(qs.value("parallel",        True, type=bool))
+        # Credentials from secure store
+        stored = self.config.get_api_key()
+        if stored:
+            self.api_key.setPlaceholderText("✅  Key stored securely (type to replace)")
+        self.ollama_url.setText(self.config.get_ollama_url())
 
-    def reset_settings(self):
+    def _save(self):
+        raw_key = self.api_key.text().strip()
+        if raw_key and "REDACTED" not in raw_key:
+            if not self.config.set_api_key(raw_key):
+                QMessageBox.warning(
+                    self, "⚠️  Could Not Save Key",
+                    "keyring is required to store keys securely.\n\n"
+                    "Run:  pip install keyring\n\nKey was NOT saved."
+                )
+                return
+            self.api_key.clear()
+            self.api_key.setPlaceholderText("✅  Key saved securely")
+
+        url = self.ollama_url.text().strip() or "http://localhost:11434"
+        self.config.set_ollama_url(url)
+
+        qs = QSettings("Symphony-IR", "Desktop")
+        qs.setValue("provider",   self.provider.currentText())
+        qs.setValue("model_idx",  self.model.currentIndex())
+        qs.setValue("max_phases", self.max_phases.value())
+        qs.setValue("confidence", self.confidence.value())
+        qs.setValue("parallel",   self.parallel.isChecked())
+
+        self.config.set("provider", self.provider.currentText())
+
+        QMessageBox.information(
+            self, "✅  Saved",
+            "Settings saved.\n"
+            "API key is encrypted in your system Credential Manager.\n"
+            "No sensitive data was written to disk."
+        )
+
+    def _migrate(self):
+        cfg_path = PROJECT_ROOT / ".orchestrator" / "config.json"
+        if not cfg_path.exists():
+            QMessageBox.information(self, "Nothing to Migrate", "No config.json found.")
+            return
+        try:
+            raw = json.loads(cfg_path.read_text())
+        except Exception as exc:
+            show_error(self, ErrorHandler.handle_error(exc, "migrate_read").to_dict())
+            return
+
+        key = raw.get("api_key") or raw.get("ANTHROPIC_API_KEY") or ""
+        if not key or "REDACTED" in key:
+            QMessageBox.information(self, "Nothing to Migrate",
+                                    "No plaintext API key found in config.json.")
+            return
+
         reply = QMessageBox.question(
-            self, "Confirm",
-            "Reset all settings to defaults?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self, "Migrate Credentials?",
+            "A plaintext API key was found in config.json.\n\n"
+            "Move it to the secure Credential Manager and remove it from the file?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.StandardButton.Yes:
-            settings = QSettings("Symphony-IR", "Orchestra")
-            settings.clear()
-            self.load_settings()
+        if reply != QMessageBox.StandardButton.Yes:
+            return
 
+        if self.config.set_api_key(key):
+            raw["api_key"] = None
+            raw["ANTHROPIC_API_KEY"] = None
+            cfg_path.write_text(json.dumps(raw, indent=2))
+            self.api_key.clear()
+            self.api_key.setPlaceholderText("✅  Key migrated to secure storage")
+            QMessageBox.information(
+                self, "✅  Done",
+                "API key moved to Credential Manager.\n"
+                "Plaintext entry removed from config.json."
+            )
+        else:
+            QMessageBox.critical(self, "Migration Failed",
+                                 "Could not store key securely.\n"
+                                 "Run:  pip install keyring")
+
+    def _delete_key(self):
+        reply = QMessageBox.question(
+            self, "Delete Stored Key?",
+            "This permanently removes the stored API key.\n"
+            "You will need to re-enter it to use Claude.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        if self.config.delete_api_key():
+            self.api_key.clear()
+            self.api_key.setPlaceholderText("sk-ant-…  (no key stored)")
+            QMessageBox.information(self, "✅  Deleted",
+                                    "API key removed from Credential Manager.")
+        else:
+            QMessageBox.warning(self, "Not Found", "No API key was stored.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Window
+# ─────────────────────────────────────────────────────────────────────────────
 
 class SymphonyIRApp(QMainWindow):
-    """Main application window"""
-
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Symphony-IR - AI Orchestrator")
-        self.setWindowIcon(QIcon("symphony_icon.png"))
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("Symphony-IR  —  AI Orchestrator")
+        self.setGeometry(100, 100, 1260, 820)
+        self.setMinimumSize(900, 600)
 
-        # Create menu bar
-        self.create_menus()
+        self.config = get_secure_config(PROJECT_ROOT)
 
-        # Create central widget with tabs
         tabs = QTabWidget()
-        tabs.addTab(OrchestratorTab(), "🎼 Orchestrator")
-        tabs.addTab(FlowTab(), "🗺️ Symphony Flow")
-        tabs.addTab(HistoryTab(), "📋 History")
-        tabs.addTab(SettingsTab(), "⚙️ Settings")
-
+        tabs.addTab(OrchestratorTab(self.config), "🎼  Orchestrator")
+        tabs.addTab(FlowTab(self.config),          "🗺️  Symphony Flow")
+        tabs.addTab(HistoryTab(),                  "📋  History")
+        tabs.addTab(SettingsTab(self.config),       "⚙️  Settings")
         self.setCentralWidget(tabs)
 
-        # Status bar
-        self.statusBar().showMessage("Ready")
+        self._build_menus()
+        self.setStyleSheet(_STYLESHEET)
 
-        # Apply styling
-        self.setStyleSheet(self.get_stylesheet())
+        status = ("🔐 keyring available" if CredentialManager.is_available()
+                  else "⚠️  keyring not installed — run:  pip install keyring")
+        self.statusBar().showMessage(f"Ready  ·  {status}")
 
-    def create_menus(self):
-        menubar = self.menuBar()
+    def _build_menus(self):
+        mb = self.menuBar()
 
-        # File menu
-        file_menu = menubar.addMenu("File")
-        exit_action = QAction("Exit", self)
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
+        fm = mb.addMenu("File")
+        qa = QAction("Quit", self)
+        qa.triggered.connect(self.close)
+        fm.addAction(qa)
 
-        # Help menu
-        help_menu = menubar.addMenu("Help")
-        about_action = QAction("About", self)
-        about_action.triggered.connect(self.show_about)
-        help_menu.addAction(about_action)
+        hm = mb.addMenu("Help")
+        actions = [
+            ("About Symphony-IR",          self._about),
+            ("Online Documentation",       lambda: webbrowser.open(
+                "https://github.com/courtneybtaylor-sys/Symphony-IR#readme")),
+            ("Set up Ollama (Local AI)",   lambda: webbrowser.open("https://ollama.ai")),
+            ("Security Guide",             lambda: webbrowser.open(
+                "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/SECURITY.md")),
+            ("Report an Issue",            lambda: webbrowser.open(
+                "https://github.com/courtneybtaylor-sys/Symphony-IR/issues")),
+        ]
+        for label, handler in actions:
+            a = QAction(label, self)
+            a.triggered.connect(handler)
+            hm.addAction(a)
 
-        docs_action = QAction("Documentation", self)
-        docs_action.triggered.connect(self.open_documentation)
-        help_menu.addAction(docs_action)
-
-    def show_about(self):
-        QMessageBox.information(
-            self,
-            "About Symphony-IR",
-            "Symphony-IR v1.0\n\n"
-            "Deterministic multi-agent orchestration engine with "
-            "structured guidance and beautiful GUI.\n\n"
-            "https://github.com/courtneybtaylor-sys/Symphony-IR"
+    def _about(self):
+        QMessageBox.about(
+            self, "About Symphony-IR",
+            "Symphony-IR  v1.0\n"
+            "Deterministic multi-agent AI orchestration\n\n"
+            "Security:\n"
+            "  🔐  API keys → Windows Credential Manager\n"
+            "  📋  Sessions → auto-redacted\n"
+            "  💬  Errors  → plain English + suggestions\n\n"
+            "github.com/courtneybtaylor-sys/Symphony-IR"
         )
 
-    def open_documentation(self):
-        import webbrowser
-        webbrowser.open("https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/README.md")
 
-    def get_stylesheet(self):
-        return """
-            QMainWindow {
-                background-color: #f5f5f5;
-            }
-            QTabBar::tab {
-                background-color: #e0e0e0;
-                padding: 8px 20px;
-                margin-right: 2px;
-            }
-            QTabBar::tab:selected {
-                background-color: #2196F3;
-                color: white;
-            }
-            QGroupBox {
-                color: #333;
-                border: 1px solid #ddd;
-                border-radius: 5px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 3px 0 3px;
-            }
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #1976D2;
-            }
-            QPushButton:pressed {
-                background-color: #1565C0;
-            }
-            QLineEdit, QTextEdit, QComboBox {
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                padding: 5px;
-                background-color: white;
-            }
-            QStatusBar {
-                background-color: #f5f5f5;
-                border-top: 1px solid #ddd;
-            }
-        """
+# ─────────────────────────────────────────────────────────────────────────────
+# Stylesheet
+# ─────────────────────────────────────────────────────────────────────────────
 
+_STYLESHEET = """
+QMainWindow, QDialog { background: #F5F5F5; }
+
+QTabBar::tab {
+    background: #E0E0E0; padding: 8px 22px;
+    margin-right: 2px; border-radius: 4px 4px 0 0;
+}
+QTabBar::tab:selected { background: #1565C0; color: white; }
+QTabBar::tab:hover:!selected { background: #BBDEFB; }
+
+QGroupBox {
+    border: 1px solid #CFD8DC; border-radius: 6px;
+    margin-top: 12px; padding-top: 10px; background: white;
+}
+QGroupBox::title {
+    subcontrol-origin: margin; left: 10px; padding: 0 4px;
+    color: #1565C0; font-weight: bold;
+}
+
+QPushButton {
+    background: #1976D2; color: white; border: none;
+    border-radius: 4px; padding: 8px 16px; font-weight: bold;
+}
+QPushButton:hover   { background: #1565C0; }
+QPushButton:pressed { background: #0D47A1; }
+QPushButton:disabled { background: #B0BEC5; color: #ECEFF1; }
+
+QLineEdit, QTextEdit, QComboBox, QSpinBox {
+    border: 1px solid #B0BEC5; border-radius: 4px;
+    padding: 5px 7px; background: white;
+}
+QLineEdit:focus, QTextEdit:focus, QComboBox:focus { border-color: #1976D2; }
+
+QTableWidget { gridline-color: #ECEFF1; background: white; alternate-background-color: #F5F5F5; }
+QHeaderView::section {
+    background: #1565C0; color: white;
+    padding: 6px; border: none; font-weight: bold;
+}
+
+QProgressBar { border: 1px solid #B0BEC5; border-radius: 4px; text-align: center; }
+QProgressBar::chunk { background: #1976D2; border-radius: 4px; }
+
+QStatusBar { background: #ECEFF1; border-top: 1px solid #CFD8DC; color: #546E7A; }
+"""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
     app = QApplication(sys.argv)
+    app.setApplicationName("Symphony-IR")
+    app.setOrganizationName("Symphony-IR")
     window = SymphonyIRApp()
     window.show()
     sys.exit(app.exec())
