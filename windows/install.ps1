@@ -153,7 +153,7 @@ Write-Host ""
 Write-Host "🚀 To start Symphony-IR:" -ForegroundColor Cyan
 Write-Host "   • Click 'Symphony-IR' in Start Menu" -ForegroundColor Gray
 Write-Host "   • Or double-click 'Symphony-IR' on Desktop" -ForegroundColor Gray
-Write-Host "   • Or run: python $InstallPath\gui\desktop_app.py" -ForegroundColor Gray
+Write-Host "   • Or run: python $InstallPath\gui\main.py" -ForegroundColor Gray
 Write-Host ""
 Write-Host "📚 Documentation:" -ForegroundColor Cyan
 Write-Host "   • README: $InstallPath\README.md" -ForegroundColor Gray
