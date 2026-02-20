@@ -5,11 +5,11 @@ PyQt6-Charts==6.6.0
 # Security
 keyring==24.3.0  # Secure credential storage (Windows Credential Manager, etc.)
 
-# Existing dependencies
-streamlit==1.28.1
-anthropic==0.7.0
-pyyaml==6.0
-requests==2.31.0
+# Core dependencies
+# Note: These are shared with the orchestrator but listed here for convenience
+pyyaml>=7.0      # Updated for better Windows wheel support
+anthropic>=0.28.0
+requests>=2.31.0
 
-# Packaging
-PyInstaller==6.1.0
+# Optional: For PyInstaller builds
+PyInstaller>=6.1.0
