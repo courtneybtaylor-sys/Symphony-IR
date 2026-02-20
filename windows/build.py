@@ -34,7 +34,7 @@ if DIST_DIR.exists():
 
 # PyInstaller spec
 spec = [
-    str(GUI_DIR / "desktop_app.py"),
+    str(GUI_DIR / "main.py"),
     # Output
     f"--name=Symphony-IR",
     f"--distpath={DIST_DIR}",
