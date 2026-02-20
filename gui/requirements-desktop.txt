@@ -1,15 +1,15 @@
-# Desktop GUI Requirements
+# Desktop GUI Requirements — PyQt6 based application
+#
+# Note: Orchestrator dependencies (pyyaml, anthropic, etc.) are handled
+# separately by the orchestrator init script. This file contains ONLY
+# the GUI dependencies to keep installation simple.
+
+# UI Framework
 PyQt6==6.6.1
 PyQt6-Charts==6.6.0
 
-# Security
-keyring==24.3.0  # Secure credential storage (Windows Credential Manager, etc.)
+# Security — credential storage in system Credential Manager
+keyring==24.3.0
 
-# Core dependencies
-# Note: These are shared with the orchestrator but listed here for convenience
-pyyaml>=7.0      # Updated for better Windows wheel support
-anthropic>=0.28.0
-requests>=2.31.0
-
-# Optional: For PyInstaller builds
+# Optional: For building standalone Windows executable
 PyInstaller>=6.1.0
