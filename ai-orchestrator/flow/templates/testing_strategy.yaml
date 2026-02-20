@@ -1,0 +1,124 @@
+template_id: "testing_strategy"
+name: "Testing Strategy Planning"
+description: "Guided workflow for creating comprehensive testing strategies"
+
+nodes:
+  start:
+    summary: "Defining testing scope"
+    role: "architect"
+    intent: "Define testing strategy for {component_name}"
+    phase: "PLANNING"
+    priority: 6
+    context_refs:
+      - "file:{component_name}"
+    constraints: []
+    token_budget_hint: 900
+    options:
+      - id: "A"
+        label: "Unit testing"
+        description: "Plan unit test coverage and frameworks"
+        next_node_id: "unit_testing"
+      - id: "B"
+        label: "Integration testing"
+        description: "Plan integration and API testing"
+        next_node_id: "integration_testing"
+      - id: "C"
+        label: "Full test pyramid"
+        description: "Design complete test pyramid"
+        next_node_id: "pyramid_testing"
+
+  unit_testing:
+    summary: "Planning unit testing"
+    role: "implementer"
+    intent: "Plan unit testing strategy for {component_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{component_name}"
+    constraints:
+      - "Identify units to test"
+      - "Recommend test framework and tools"
+      - "Plan test data and mocks"
+      - "Set coverage targets (minimum 80%)"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Expand to integration"
+        description: "Add integration testing layer"
+        next_node_id: "integration_testing"
+
+  integration_testing:
+    summary: "Planning integration testing"
+    role: "implementer"
+    intent: "Plan integration testing for {component_name} with dependencies"
+    phase: "PLANNING"
+    priority: 7
+    context_refs:
+      - "file:{component_name}"
+    constraints:
+      - "Identify integration points"
+      - "Plan test environment and fixtures"
+      - "Include API contract testing"
+      - "Define test data management"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Add performance testing"
+        description: "Include load and stress testing"
+        next_node_id: "performance_testing"
+
+  pyramid_testing:
+    summary: "Designing test pyramid"
+    role: "architect"
+    intent: "Design complete test pyramid for {component_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{component_name}"
+    constraints:
+      - "Define test distribution (unit, integration, end-to-end)"
+      - "Recommend test frameworks for each level"
+      - "Plan test automation and CI/CD"
+      - "Include manual testing strategies"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Performance testing"
+        description: "Add performance and load testing"
+        next_node_id: "performance_testing"
+      - id: "B"
+        label: "Security testing"
+        description: "Add security and vulnerability testing"
+        next_node_id: "security_testing"
+
+  performance_testing:
+    summary: "Planning performance testing"
+    role: "implementer"
+    intent: "Plan load, stress, and performance testing for {component_name}"
+    phase: "PLANNING"
+    priority: 7
+    context_refs:
+      - "file:{component_name}"
+    constraints:
+      - "Define performance baselines and targets"
+      - "Identify bottlenecks to test"
+      - "Recommend load testing tools"
+      - "Plan scalability assessment"
+    token_budget_hint: 1200
+    options: []
+
+  security_testing:
+    summary: "Planning security testing"
+    role: "reviewer"
+    intent: "Plan security testing and vulnerability assessment for {component_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{component_name}"
+    constraints:
+      - "Identify security vulnerabilities to test"
+      - "Recommend security testing tools"
+      - "Plan penetration testing approach"
+      - "Include OWASP top 10 coverage"
+    token_budget_hint: 1200
+    options: []

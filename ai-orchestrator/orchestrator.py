@@ -616,6 +616,328 @@ def _setup_mock_agents(registry: AgentRegistry):
         registry.register_agent(agent)
 
 
+def _get_available_templates():
+    """Get list of available flow templates."""
+    templates_dir = Path(PACKAGE_DIR) / "flow" / "templates"
+    templates = []
+    if templates_dir.exists():
+        for template_file in sorted(templates_dir.glob("*.yaml")):
+            templates.append(template_file.stem)
+    return templates
+
+
+def cmd_flow_list(args):
+    """List available flow templates."""
+    templates = _get_available_templates()
+
+    if not templates:
+        print("No flow templates found.")
+        return 1
+
+    print("📚 Available Symphony Flow Templates:\n")
+
+    import yaml
+
+    for template_name in templates:
+        template_path = (
+            Path(PACKAGE_DIR) / "flow" / "templates" / f"{template_name}.yaml"
+        )
+        try:
+            with open(template_path) as f:
+                data = yaml.safe_load(f)
+
+            name = data.get("name", template_name)
+            description = data.get("description", "")
+            nodes = data.get("nodes", {})
+
+            print(f"🎯 {name} ({template_name})")
+            print(f"   {description}")
+            print(f"   Nodes: {len(nodes)}")
+            print()
+        except Exception as e:
+            print(f"⚠️  {template_name}: Error reading template ({str(e)})")
+            print()
+
+    return 0
+
+
+def cmd_flow_status(args):
+    """Show status of flow projects."""
+    project_root = Path(args.project).resolve()
+    orch_dir = project_root / ".orchestrator"
+    flows_dir = orch_dir / "flows"
+
+    if not flows_dir.exists():
+        print("No flow projects found. Start a flow with: orchestrator flow --template <name>")
+        return 0
+
+    projects = sorted(flows_dir.glob("*.json"))
+
+    if not projects:
+        print("No flow projects found.")
+        return 0
+
+    print(f"🎼 Flow Projects ({len(projects)} total):\n")
+
+    for project_file in projects[:20]:  # Show most recent 20
+        try:
+            with open(project_file) as f:
+                state = json.load(f)
+
+            project_id = state.get("project_id", "unknown")
+            template_id = state.get("template_id", "unknown")
+            current_node = state.get("current_node_id", "unknown")
+            decisions = len(state.get("decisions", []))
+            path_length = len(state.get("selected_path", []))
+
+            print(f"📋 {project_id} | {template_id}")
+            print(f"   Current: {current_node}")
+            print(f"   Progress: {path_length} nodes, {decisions} decisions")
+            print()
+        except Exception as e:
+            print(f"⚠️  Error reading {project_file.name}: {str(e)}")
+
+    return 0
+
+
+def cmd_flow(args):
+    """Execute guided flow workflow with bounded decision tree."""
+    from flow.engine import BranchEngine
+    from flow.adapter import IRAdapter
+
+    # Parse variables
+    variables = {}
+    for v in args.var:
+        if "=" not in v:
+            print(f"❌ Invalid variable format: {v}")
+            print("   Use: --var key=value")
+            return 1
+        key, val = v.split("=", 1)
+        variables[key] = val
+
+    # Template path
+    template_path = Path(PACKAGE_DIR) / "flow" / "templates" / f"{args.template}.yaml"
+    if not template_path.exists():
+        available = _get_available_templates()
+        print(f"❌ Template not found: {args.template}")
+        if available:
+            print(f"   Available templates: {', '.join(available)}")
+        print(f"\n   View all: orchestrator flow-list")
+        return 1
+
+    # Set up logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    )
+
+    # Load environment
+    project_root = Path(args.project).resolve()
+    orch_dir = project_root / ".orchestrator"
+    env_file = orch_dir / ".env"
+    if env_file.exists():
+        _load_env_file(str(env_file))
+
+    # Load agent registry for execution
+    agents_yaml = orch_dir / "agents.yaml"
+    registry = AgentRegistry()
+    use_mock = False
+
+    if agents_yaml.exists():
+        try:
+            registry.load_from_yaml(str(agents_yaml))
+        except Exception as e:
+            logger.warning(f"Could not load agents config: {e}")
+            print("⚠️  Falling back to mock agents.")
+            use_mock = True
+    else:
+        print("⚠️  No agents.yaml found. Using mock agents.")
+        use_mock = True
+
+    if use_mock:
+        _setup_mock_agents(registry)
+
+    # Set up governance and compilation
+    governance = MaaTGovernanceEngine()
+    compiler = None
+    validator = None
+    ir_pipeline = None
+
+    if not args.no_compile:
+        try:
+            compiler = PromptCompiler(
+                templates_path=str(PACKAGE_DIR / "config"),
+                config={},
+            )
+        except Exception as e:
+            logger.warning(f"Could not initialize prompt compiler: {e}")
+
+        validator = SchemaValidator()
+
+        if not args.no_ir and compiler:
+            ir_governance = IRGovernanceChecker()
+            ir_plugins = [
+                ContextDigestPlugin(config={"max_context_refs": 10}),
+                BudgetOptimizerPlugin(),
+            ]
+            ir_pipeline = PromptIRPipeline(
+                plugins=ir_plugins,
+                governance=ir_governance,
+            )
+
+    # Agent executor
+    def agent_executor(agent_name, phase_brief, ctx):
+        if registry.has_agent(agent_name):
+            agent = registry.get_agent(agent_name)
+            return agent.execute(phase_brief, ctx)
+        else:
+            return {
+                "agent_name": agent_name,
+                "role": "unknown",
+                "output": f"Agent '{agent_name}' not found",
+                "confidence": 0.0,
+                "risk_flags": ["CRITICAL_missing_agent"],
+            }
+
+    def agent_provider_resolver(agent_name):
+        if registry.has_agent(agent_name):
+            return registry.get_agent(agent_name).config.model_provider
+        return "mock"
+
+    # Initialize engine
+    try:
+        engine = BranchEngine(str(template_path))
+        engine.state.variables = variables
+        adapter = IRAdapter(engine.state)
+    except Exception as e:
+        print(f"❌ Failed to initialize flow: {str(e)}")
+        return 1
+
+    orchestrator = Orchestrator(
+        config={"max_phases": 10, "confidence_threshold": 0.85},
+        agent_executor=agent_executor,
+        governance_checker=lambda at, ad, ctx: governance.evaluate_action(at, ad, ctx),
+        prompt_compiler=compiler,
+        schema_validator=validator,
+        agent_provider_resolver=agent_provider_resolver,
+        ir_pipeline=ir_pipeline,
+    )
+
+    print("=" * 60)
+    print(f"🎼 Symphony Flow: {args.template}")
+    print(f"📋 Project ID: {engine.state.project_id}")
+    if variables:
+        print(f"📌 Variables: {', '.join(f'{k}={v}' for k, v in variables.items())}")
+    print("=" * 60)
+    print()
+
+    decision_count = 0
+    execution_count = 0
+
+    # Main decision loop
+    try:
+        while True:
+            node = engine.get_current_node()
+
+            # Display current step
+            print(f"\n✓ Step {len(engine.state.selected_path)}: {node.summary}\n")
+
+            # Terminal node check
+            if not node.options:
+                print("🎉 Workflow complete!\n")
+                break
+
+            # Show options
+            print("What's next?")
+            for opt in node.options:
+                print(f"  {opt.id}) {opt.label}")
+                if opt.description:
+                    print(f"      {opt.description}")
+            print()
+
+            # Get choice
+            import click
+
+            choice = click.prompt("Choice", type=str).strip().upper()
+
+            # Validate
+            valid_ids = [o.id for o in node.options]
+            if choice not in valid_ids:
+                print(f"❌ Invalid choice. Choose from: {', '.join(valid_ids)}\n")
+                continue
+
+            # Navigate
+            try:
+                next_node = engine.select_option(choice)
+                decision_count += 1
+                print(f"→ Selected: {choice}")
+            except ValueError as e:
+                print(f"❌ Navigation error: {str(e)}\n")
+                continue
+
+            # Execute
+            print("\n⚙️  Executing via Symphony-IR...\n")
+
+            try:
+                result = orchestrator.run(
+                    next_node.summary, {"node_id": next_node.id}
+                )
+                execution_count += 1
+
+                # Display result summary
+                print(f"\n✓ Execution complete")
+                print(f"  Run ID: {result.run_id}")
+                print(f"  Confidence: {result.confidence:.2f}")
+                print(f"  Agent responses: {len(result.agent_responses)}")
+
+                # Record execution
+                engine.record_execution(next_node.id, result.run_id)
+
+            except Exception as e:
+                logger.error(f"Execution failed: {e}", exc_info=True)
+                print(f"❌ Execution failed: {str(e)}")
+                print("   Continuing to next decision...")
+                print()
+                continue
+
+            print()
+
+    except KeyboardInterrupt:
+        print("\n\n⏸️  Flow interrupted by user")
+    except Exception as e:
+        logger.error(f"Unexpected error in flow: {e}", exc_info=True)
+        print(f"\n❌ Unexpected error: {str(e)}")
+
+    # Save state
+    save_path = orch_dir / "flows" / f"{engine.state.project_id}.json"
+    try:
+        engine.save_state(str(save_path))
+        print(f"💾 Session saved: {save_path}")
+    except Exception as e:
+        print(f"⚠️  Could not save session: {str(e)}")
+
+    # Display summary
+    print("\n" + "=" * 60)
+    print("📊 Flow Summary")
+    print("=" * 60)
+    print(f"Project:    {engine.state.project_id}")
+    print(f"Template:   {engine.state.template_id}")
+    print(f"Nodes:      {len(engine.state.selected_path)}")
+    print(f"Decisions:  {decision_count}")
+    print(f"Executions: {execution_count}")
+    print(f"Current:    {engine.get_current_node().id}")
+
+    if engine.get_current_node().options:
+        print(f"Status:     In Progress")
+    else:
+        print(f"Status:     Complete")
+
+    print("=" * 60)
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="AI Orchestrator - Deterministic multi-agent coordination engine",
@@ -688,6 +1010,42 @@ def main():
         "--export", type=str, help="Export report to file"
     )
 
+    # flow
+    flow_parser = subparsers.add_parser(
+        "flow", help="Guided decision-tree workflow execution"
+    )
+    flow_parser.add_argument(
+        "--template", required=True, help="Template name (e.g., code_review, refactor_code, new_feature)"
+    )
+    flow_parser.add_argument(
+        "--var", action='append', default=[], help="Variables (format: key=value)"
+    )
+    flow_parser.add_argument(
+        "--project", default=".", help="Project root directory (default: current dir)"
+    )
+    flow_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Detailed output"
+    )
+    flow_parser.add_argument(
+        "--no-compile", action="store_true", help="Disable prompt compiler"
+    )
+    flow_parser.add_argument(
+        "--no-ir", action="store_true", help="Disable IR pipeline"
+    )
+
+    # flow-list
+    flow_list_parser = subparsers.add_parser(
+        "flow-list", help="List available flow templates"
+    )
+
+    # flow-status
+    flow_status_parser = subparsers.add_parser(
+        "flow-status", help="Show status of flow projects"
+    )
+    flow_status_parser.add_argument(
+        "--project", default=".", help="Project root directory (default: current dir)"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -700,6 +1058,9 @@ def main():
         "status": cmd_status,
         "history": cmd_history,
         "efficiency": cmd_efficiency,
+        "flow": cmd_flow,
+        "flow-list": cmd_flow_list,
+        "flow-status": cmd_flow_status,
     }
 
     return commands[args.command](args)
