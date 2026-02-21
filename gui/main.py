@@ -33,6 +33,7 @@ from tabs.orchestrator_tab import OrchestratorTab
 from tabs.flow_tab import FlowTab
 from tabs.history_tab import HistoryTab
 from tabs.settings_tab import SettingsTab
+from setup_wizard import SetupWizard, should_run_setup_wizard
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,13 @@ def main():
     app.setApplicationName(APP_NAME)
     app.setApplicationVersion(VERSION)
     app.setOrganizationName(ORG_NAME)
+
+    # Show setup wizard on first run
+    if should_run_setup_wizard():
+        logger.info("First run detected — showing setup wizard")
+        wizard = SetupWizard()
+        wizard_result = wizard.exec()
+        logger.info("Setup wizard completed (result: %s)", wizard_result)
 
     window = SymphonyIRApp()
     window.show()
