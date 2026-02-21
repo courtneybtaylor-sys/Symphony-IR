@@ -37,31 +37,36 @@ jobs:
           pip install -r ai-orchestrator/requirements.txt
           pip install -r gui/requirements-desktop.txt
           pip install pytest pytest-cov
+        shell: bash
 
       - name: Validate Python imports
         env:
-          PYTHONPATH: ${{ github.workspace }}/ai-orchestrator:${{ env.PYTHONPATH }}
+          PYTHONPATH: ${{ github.workspace }}/ai-orchestrator
         run: |
           echo "✓ Testing core imports..."
           python -c "import orchestrator"
           python -c "import gui.main" 2>/dev/null || echo "⚠ PyQt6 GUI import skipped (headless environment)"
           python -c "from gui import streamlit_app" || echo "⚠ Streamlit app import skipped"
+        shell: bash
 
       - name: Validate design tokens
         run: |
           echo "✓ Testing design token generation..."
           python gui/design_tokens.py --validate 2>/dev/null || echo "⚠ Design tokens validation skipped"
+        shell: bash
 
       - name: Validate CLI help
         run: |
           echo "✓ Testing CLI help..."
           python ai-orchestrator/orchestrator.py --help | grep -q "usage" || echo "✓ CLI works"
+        shell: bash
 
       - name: Run pytest (if tests exist)
         continue-on-error: true
         run: |
           echo "✓ Running pytest suite..."
-          pytest tests/ -v --tb=short --cov=ai_orchestrator --cov=gui --cov-report=term-missing 2>/dev/null || echo "⚠ No tests found yet"
+          pytest tests/ -v --tb=short --cov=orchestrator --cov=gui --cov-report=term-missing 2>/dev/null || echo "⚠ No tests found yet"
+        shell: bash
 
   lint-check:
     runs-on: ubuntu-latest
@@ -115,6 +120,7 @@ jobs:
               echo "  - Validating $file"
             fi
           done 2>/dev/null || true
+        shell: bash
 
       - name: Check for broken links (markdown)
         continue-on-error: true
@@ -163,17 +169,20 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml
+        shell: bash
 
       - name: Check for syntax errors
         run: |
           python -m py_compile ai-orchestrator/orchestrator.py || exit 1
           python -m py_compile gui/main.py || exit 1
           echo "✓ All Python files compile successfully"
+        shell: bash
 
       - name: Validate YAML files
         run: |
           python -c "import yaml; import os; [yaml.safe_load(open(os.path.join(root, f))) for root, dirs, files in os.walk('ai-orchestrator/flow/templates') for f in files if f.endswith('.yaml')]"
           echo "✓ All YAML files are valid"
+        shell: bash
 
       - name: Check Apache license headers
         continue-on-error: true
@@ -188,3 +197,4 @@ jobs:
               fi
             fi
           done
+        shell: bash
