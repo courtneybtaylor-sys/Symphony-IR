@@ -12,7 +12,7 @@ import json
 import logging
 from pathlib import Path
 
-from PyQt6.QtCore import QSettings
+from PyQt6.QtCore import QSettings, Qt
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
     QLineEdit, QMessageBox, QPushButton, QSpinBox, QVBoxLayout, QWidget,
@@ -124,13 +124,16 @@ class SettingsTab(QWidget):
 
         # Action buttons
         btn_row = QHBoxLayout()
-        save_btn = _btn("💾  Save Settings",    "#4CAF50")
-        mig_btn  = _btn("🔄  Migrate Old Keys", "#FF9800")
-        del_btn  = _btn("🗑  Delete Key",        "#F44336")
+        save_btn   = _btn("💾  Save Settings",       "#4CAF50")
+        health_btn = _btn("🔍  Check System Health", "#2196F3")
+        mig_btn    = _btn("🔄  Migrate Old Keys",    "#FF9800")
+        del_btn    = _btn("🗑  Delete Key",           "#F44336")
         save_btn.clicked.connect(self._save)
+        health_btn.clicked.connect(self._run_preflight)
         mig_btn.clicked.connect(self._migrate)
         del_btn.clicked.connect(self._delete_key)
         btn_row.addWidget(save_btn)
+        btn_row.addWidget(health_btn)
         btn_row.addWidget(mig_btn)
         btn_row.addWidget(del_btn)
         btn_row.addStretch()
@@ -226,6 +229,74 @@ class SettingsTab(QWidget):
             f"Migrated {migrated} credential(s) to Credential Manager.\n"
             "Plaintext values removed from config.json."
         )
+
+    def _run_preflight(self):
+        """Run pre-flight checks and show results in a dialog."""
+        import sys as _sys
+        # Ensure ai-orchestrator is importable
+        orch_dir = self._project_root / "ai-orchestrator"
+        if str(orch_dir) not in _sys.path:
+            _sys.path.insert(0, str(orch_dir))
+
+        try:
+            from preflight import run_checks, summary, CheckStatus as CS
+        except ImportError:
+            QMessageBox.warning(
+                self, "Preflight Unavailable",
+                "Could not import preflight module.\n"
+                "Make sure ai-orchestrator/ is part of your installation."
+            )
+            return
+
+        provider = self.provider.currentText()
+        if "Ollama" in provider:
+            prov = "ollama"
+        elif "OpenAI" in provider:
+            prov = "openai"
+        else:
+            prov = "claude"
+
+        api_key    = CredentialService.get_api_key() or ""
+        ollama_url = self.ollama_url.text().strip() or "http://localhost:11434"
+
+        results = run_checks(
+            project_root=self._project_root,
+            provider=prov,
+            api_key=api_key,
+            ollama_url=ollama_url,
+        )
+
+        n_pass, n_warn, n_fail = summary(results)
+        icon_map = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌", "SKIP": "⏭️"}
+
+        lines = ["<b>Symphony-IR System Health</b><br>"]
+        for r in results:
+            icon = icon_map.get(r.status.value, "")
+            colour = {"PASS": "#388E3C", "WARN": "#E65100", "FAIL": "#C62828", "SKIP": "#757575"}.get(r.status.value, "")
+            lines.append(
+                f'<span style="color:{colour}">{icon} <b>{r.name}</b>: {r.message}</span>'
+            )
+            if r.fix:
+                lines.append(f'&nbsp;&nbsp;&nbsp;→ <i>{r.fix}</i>')
+
+        lines.append("")
+        if n_fail:
+            lines.append(f'<span style="color:#C62828"><b>{n_fail} check(s) failed — fix before running.</b></span>')
+        elif n_warn:
+            lines.append(f'<span style="color:#E65100"><b>{n_warn} warning(s) — Symphony-IR will work but may be limited.</b></span>')
+        else:
+            lines.append('<span style="color:#388E3C"><b>All checks passed! Ready to run.</b></span>')
+
+        msg = QMessageBox(self)
+        msg.setWindowTitle("🔍  System Health Check")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText("<br>".join(lines))
+        msg.setIcon(
+            QMessageBox.Icon.Critical if n_fail
+            else QMessageBox.Icon.Warning if n_warn
+            else QMessageBox.Icon.Information
+        )
+        msg.exec()
 
     def _delete_key(self):
         reply = QMessageBox.question(

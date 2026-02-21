@@ -22,6 +22,7 @@ if str(PACKAGE_DIR) not in sys.path:
     sys.path.insert(0, str(PACKAGE_DIR))
 
 from cli_error_handler import translate_and_print, wrap_main
+from preflight import run_checks, print_report, passed as preflight_passed, CheckStatus
 from core.orchestrator import Orchestrator, AgentResponse, OrchestratorState
 from core.governance import MaaTGovernanceEngine
 from core.prompt_compiler import PromptCompiler
@@ -258,6 +259,30 @@ def cmd_run(args):
     if env_file.exists():
         _load_env_file(str(env_file))
 
+    # Pre-flight checks (skip with --skip-preflight for CI/scripts)
+    if not getattr(args, "skip_preflight", False):
+        provider = os.environ.get("SYMPHONY_PROVIDER", "claude")
+        api_key  = os.environ.get("ANTHROPIC_API_KEY", "")
+        ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+        results = run_checks(
+            project_root=project_root,
+            provider=provider,
+            api_key=api_key,
+            ollama_url=ollama_url,
+        )
+        # Print only failures and warnings (not PASS items) to keep output clean
+        fails  = [r for r in results if r.status == CheckStatus.FAIL]
+        warns  = [r for r in results if r.status == CheckStatus.WARN]
+        if fails:
+            print_report(results, verbose=False)
+            print("Fix the issues above before running.  Use --skip-preflight to bypass.")
+            return 1
+        if warns:
+            for r in warns:
+                print(f"⚠️   {r.name}: {r.message}")
+                if r.fix:
+                    print(f"    → {r.fix}")
+
     # Set up context providers
     context_manager = ContextManager()
     context_manager.add_provider(FileSystemContext(str(project_root)))
@@ -447,6 +472,31 @@ def cmd_run(args):
         validator.export_log(str(logs_dir / f"validation_{timestamp}_{ledger.run_id}.json"))
 
     return 0
+
+
+def cmd_preflight(args):
+    """Run pre-flight environment checks."""
+    project_root = Path(args.project).resolve()
+
+    # Determine provider from agents.yaml or env
+    provider = args.provider or os.environ.get("SYMPHONY_PROVIDER", "claude")
+
+    # Load API key from env / .env file
+    env_file = project_root / ".orchestrator" / ".env"
+    if env_file.exists():
+        _load_env_file(str(env_file))
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+    ollama_url = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    results = run_checks(
+        project_root=project_root,
+        provider=provider,
+        api_key=api_key,
+        ollama_url=ollama_url,
+    )
+    ok = print_report(results, verbose=args.verbose)
+    return 0 if ok else 1
 
 
 def cmd_status(args):
@@ -981,6 +1031,25 @@ def main():
         "--no-ir", action="store_true",
         help="Disable IR pipeline (use direct compilation instead)",
     )
+    run_parser.add_argument(
+        "--skip-preflight", action="store_true",
+        help="Skip pre-flight environment checks (useful in CI/CD)",
+    )
+
+    # preflight
+    preflight_parser = subparsers.add_parser(
+        "preflight", help="Check your environment before running (Python, API keys, Ollama, etc.)"
+    )
+    preflight_parser.add_argument(
+        "--project", default=".", help="Project root directory (default: current dir)"
+    )
+    preflight_parser.add_argument(
+        "--provider", default=None,
+        help="Provider to check: claude, ollama, openai (default: reads SYMPHONY_PROVIDER env)"
+    )
+    preflight_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show all check details including passing ones"
+    )
 
     # status
     status_parser = subparsers.add_parser(
@@ -1059,12 +1128,13 @@ def main():
         return 1
 
     commands = {
-        "init": cmd_init,
-        "run": cmd_run,
-        "status": cmd_status,
-        "history": cmd_history,
-        "efficiency": cmd_efficiency,
-        "flow": cmd_flow,
+        "init":      cmd_init,
+        "run":       cmd_run,
+        "preflight": cmd_preflight,
+        "status":    cmd_status,
+        "history":   cmd_history,
+        "efficiency":cmd_efficiency,
+        "flow":      cmd_flow,
         "flow-list": cmd_flow_list,
         "flow-status": cmd_flow_status,
     }
