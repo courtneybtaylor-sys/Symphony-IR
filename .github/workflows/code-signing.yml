@@ -37,6 +37,7 @@ jobs:
         run: python windows/build_pyinstaller.py
 
       - name: Decode and write certificate
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
         env:
           CERT_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
         run: |
@@ -45,15 +46,21 @@ jobs:
         shell: pwsh
 
       - name: Sign executable
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
         env:
           SIGN_CERT_PATH: windows/certificates/windows-cert.pfx
           SIGN_CERT_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: python windows/sign_executable.py dist/Symphony-IR.exe
 
+      - name: Skip executable signing (certificate not configured)
+        if: secrets.WINDOWS_CERT_PFX_B64 == ''
+        run: echo "⚠️  Windows executable signing skipped (WINDOWS_CERT_PFX_B64 secret not configured)"
+
       - name: Build Inno Setup installer
         run: python windows/build_innosetup.py
 
       - name: Sign installer
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
         env:
           SIGN_CERT_PATH: windows/certificates/windows-cert.pfx
           SIGN_CERT_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
@@ -61,6 +68,10 @@ jobs:
           $installer = Get-ChildItem installer_output -Filter "*.exe" | Select-Object -First 1
           python windows/sign_executable.py "$($installer.FullName)"
         shell: pwsh
+
+      - name: Skip installer signing (certificate not configured)
+        if: secrets.WINDOWS_CERT_PFX_B64 == ''
+        run: echo "⚠️  Windows installer signing skipped (WINDOWS_CERT_PFX_B64 secret not configured)"
 
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
@@ -87,6 +98,7 @@ jobs:
         run: pip install -r gui/requirements-build.txt dmgbuild
 
       - name: Import Apple Developer certificate
+        if: secrets.APPLE_CERT_P12_B64 != ''
         env:
           APPLE_CERT_P12_B64: ${{ secrets.APPLE_CERT_P12_B64 }}
           APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
@@ -103,6 +115,7 @@ jobs:
         run: python windows/build_pyinstaller.py
 
       - name: Sign .app bundle
+        if: secrets.APPLE_CERT_P12_B64 != ''
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
         run: python windows/sign_macos.py dist/Symphony-IR.app
@@ -111,17 +124,23 @@ jobs:
         run: python windows/build_dmg.py
 
       - name: Sign DMG
+        if: secrets.APPLE_CERT_P12_B64 != ''
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
         run: python windows/sign_macos.py dist/Symphony-IR.dmg
 
       - name: Notarize DMG
+        if: secrets.APPLE_CERT_P12_B64 != ''
         env:
           APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
-          APPLE_APPLE_ID:     ${{ secrets.APPLE_APPLE_ID }}
+          APPLE_APPLE_ID: ${{ secrets.APPLE_APPLE_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID:      ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: python windows/sign_macos.py dist/Symphony-IR.dmg --notarize
+
+      - name: Skip macOS signing (certificate not configured)
+        if: secrets.APPLE_CERT_P12_B64 == ''
+        run: echo "⚠️  macOS signing/notarization skipped (APPLE_CERT_P12_B64 secret not configured)"
 
       - name: Upload macOS DMG artifact
         uses: actions/upload-artifact@v4
@@ -161,21 +180,27 @@ jobs:
         run: python windows/build_appimage.py
 
       - name: Import GPG signing key
+        if: secrets.GPG_PRIVATE_KEY != ''
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE:  ${{ secrets.GPG_PASSPHRASE }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "$GPG_PRIVATE_KEY" | gpg --batch --import
           echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           gpg-connect-agent reloadagent /bye
 
       - name: Sign AppImage
+        if: secrets.GPG_PRIVATE_KEY != ''
         env:
-          GPG_KEY_ID:    ${{ secrets.GPG_KEY_ID }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           python windows/sign_linux.py dist/Symphony-IR.AppImage
           python windows/sign_linux.py --export-key
+
+      - name: Skip Linux signing (GPG key not configured)
+        if: secrets.GPG_PRIVATE_KEY == ''
+        run: echo "⚠️  Linux AppImage GPG signing skipped (GPG_PRIVATE_KEY secret not configured)"
 
       - name: Upload Linux AppImage artifacts
         uses: actions/upload-artifact@v4
