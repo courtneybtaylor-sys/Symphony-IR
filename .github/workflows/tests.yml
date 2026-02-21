@@ -108,11 +108,11 @@ jobs:
       - name: Validate markdown files
         run: |
           echo "✓ Checking markdown syntax..."
-          for file in *.md docs/*.md 2>/dev/null; do
-            if [ -f "$file" ]; then
+          for file in *.md docs/*.md; do
+            if [ -f "$file" ] 2>/dev/null; then
               echo "  - Validating $file"
             fi
-          done
+          done 2>/dev/null || true
 
       - name: Check for broken links (markdown)
         continue-on-error: true
@@ -156,6 +156,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+
+      - name: Install PyYAML
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
 
       - name: Check for syntax errors
         run: |
