@@ -30,4 +30,5 @@ if errorlevel 1 (
     echo.
     echo Run: pip install -r gui\requirements-desktop.txt
     pause
+    exit /b 1
 )

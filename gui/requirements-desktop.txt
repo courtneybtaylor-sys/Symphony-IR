@@ -4,12 +4,17 @@
 # separately by the orchestrator init script. This file contains ONLY
 # the GUI dependencies to keep installation simple.
 
-# UI Framework
-PyQt6==6.6.1
-PyQt6-Charts==6.6.0
+# Build dependencies (required for some packages on x64 Windows)
+setuptools>=65.0.0
+wheel>=0.38.0
+
+# UI Framework (updated for Windows 11 x64 compatibility)
+PyQt6==6.7.0
+PyQt6-Charts==6.7.0
 
 # Security — credential storage in system Credential Manager
-keyring==24.3.0
+# Updated version for better x64 Windows 11 compatibility
+keyring==25.1.0
 
 # Optional: For building standalone Windows executable
 PyInstaller>=6.1.0
