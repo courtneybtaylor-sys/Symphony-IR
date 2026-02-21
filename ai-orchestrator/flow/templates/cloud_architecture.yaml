@@ -1,0 +1,245 @@
+template_id: "cloud_architecture"
+name: "Cloud Architecture Design"
+description: "End-to-end cloud architecture workflow: requirements gathering, design, cost estimation, and implementation planning"
+domain: "cloud"
+industry: "technology"
+difficulty_level: "advanced"
+estimated_duration: "3-6 hours"
+tags: ["cloud", "aws", "azure", "gcp", "architecture", "infrastructure", "iac"]
+required_context: ["system_name", "requirements"]
+
+nodes:
+  start:
+    summary: "Starting cloud architecture design for {system_name}"
+    role: "architect"
+    intent: "Design cloud architecture for {system_name} based on requirements: {requirements}"
+    phase: "PLANNING"
+    priority: 9
+    context_refs:
+      - "file:{requirements}"
+    constraints:
+      - "Identify workload type, scale requirements, and compliance needs"
+      - "Define availability and disaster recovery objectives (RTO/RPO)"
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "Greenfield Architecture"
+        description: "Design new cloud-native architecture from scratch"
+        next_node_id: "requirements_analysis"
+      - id: "B"
+        label: "Migration Architecture"
+        description: "Plan lift-and-shift or re-architect migration to cloud"
+        next_node_id: "migration_assessment"
+      - id: "C"
+        label: "Multi-Cloud Strategy"
+        description: "Design for resilience across multiple cloud providers"
+        next_node_id: "multi_cloud_design"
+
+  requirements_analysis:
+    summary: "Analyzing requirements for {system_name}"
+    role: "architect"
+    intent: "Analyze functional and non-functional requirements for {system_name} cloud deployment"
+    phase: "RESEARCH"
+    priority: 9
+    context_refs:
+      - "file:{requirements}"
+    constraints:
+      - "Document: traffic patterns, data volume, latency SLAs, compliance requirements"
+      - "Identify: stateful vs stateless components, data residency needs"
+      - "Output: Architecture Decision Records (ADRs) for key choices"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Microservices Architecture"
+        description: "Design container-based microservices with Kubernetes"
+        next_node_id: "microservices_design"
+      - id: "B"
+        label: "Serverless Architecture"
+        description: "Event-driven serverless with Functions and managed services"
+        next_node_id: "serverless_design"
+      - id: "C"
+        label: "Hybrid Architecture"
+        description: "Blend of on-premises and cloud with secure connectivity"
+        next_node_id: "hybrid_design"
+
+  migration_assessment:
+    summary: "Assessing migration readiness for {system_name}"
+    role: "architect"
+    intent: "Assess current state of {system_name} and plan cloud migration strategy"
+    phase: "RESEARCH"
+    priority: 9
+    context_refs:
+      - "file:{requirements}"
+    constraints:
+      - "Apply 7R framework: Retain, Retire, Rehost, Replatform, Repurchase, Refactor, Re-architect"
+      - "Identify dependencies, data volumes, and migration complexity"
+      - "Estimate migration effort and risk for each component"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Lift and Shift (Rehost)"
+        description: "Migrate as-is to IaaS for fast results"
+        next_node_id: "lift_shift_plan"
+      - id: "B"
+        label: "Re-architecture"
+        description: "Modernize to cloud-native services during migration"
+        next_node_id: "rearchitecture_plan"
+
+  multi_cloud_design:
+    summary: "Designing multi-cloud strategy for {system_name}"
+    role: "architect"
+    intent: "Design multi-cloud architecture for {system_name} to avoid vendor lock-in and improve resilience"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define primary and failover cloud providers"
+      - "Design: data replication, traffic routing, identity federation"
+      - "Address: latency, cost, operational complexity tradeoffs"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Generate IaC Templates"
+        description: "Create Terraform or Pulumi multi-cloud infrastructure code"
+        next_node_id: "iac_generation"
+      - id: "B"
+        label: "Cost Estimation"
+        description: "Estimate costs across cloud providers"
+        next_node_id: "cost_estimation"
+
+  microservices_design:
+    summary: "Designing microservices architecture for {system_name}"
+    role: "architect"
+    intent: "Design cloud-native microservices architecture for {system_name} using containers and Kubernetes"
+    phase: "PLANNING"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Define service boundaries using Domain-Driven Design"
+      - "Design: API gateway, service mesh, observability stack"
+      - "Address: service discovery, circuit breakers, distributed tracing"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Generate IaC Templates"
+        description: "Kubernetes manifests, Helm charts, and Terraform"
+        next_node_id: "iac_generation"
+      - id: "B"
+        label: "Cost Estimation"
+        description: "Estimate infrastructure cost at various scales"
+        next_node_id: "cost_estimation"
+
+  serverless_design:
+    summary: "Designing serverless architecture for {system_name}"
+    role: "architect"
+    intent: "Design event-driven serverless architecture for {system_name} minimizing operational overhead"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Map workflows to: Functions, Queues, Event buses, Managed databases"
+      - "Address: cold starts, function timeouts, state management"
+      - "Design: IAM roles, VPC configuration, monitoring"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Generate IaC Templates"
+        description: "SAM, CDK, or Serverless Framework templates"
+        next_node_id: "iac_generation"
+      - id: "B"
+        label: "Cost Estimation"
+        description: "Estimate serverless costs with usage-based pricing"
+        next_node_id: "cost_estimation"
+
+  hybrid_design:
+    summary: "Designing hybrid cloud architecture for {system_name}"
+    role: "architect"
+    intent: "Design hybrid architecture connecting on-premises {system_name} with cloud services"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Design: VPN/Direct Connect/ExpressRoute connectivity"
+      - "Define data classification: what stays on-premises vs cloud"
+      - "Address: latency, security, compliance for hybrid workloads"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Generate Network Topology"
+        description: "Detailed network diagram and routing design"
+        next_node_id: "network_design"
+      - id: "B"
+        label: "Cost Estimation"
+        description: "Compare on-premises vs cloud cost breakdown"
+        next_node_id: "cost_estimation"
+
+  iac_generation:
+    summary: "Generating Infrastructure as Code for {system_name}"
+    role: "implementer"
+    intent: "Write production-ready IaC templates for {system_name} cloud infrastructure"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Use Terraform HCL or AWS CDK (TypeScript)"
+      - "Include: variables, outputs, state configuration"
+      - "Follow least-privilege IAM principles"
+      - "Add comments explaining each resource"
+    token_budget_hint: 3000
+    options: []
+
+  cost_estimation:
+    summary: "Estimating cloud costs for {system_name}"
+    role: "researcher"
+    intent: "Provide detailed cost estimation for {system_name} cloud infrastructure at different scales"
+    phase: "RESEARCH"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Estimate: base cost, peak cost, and 1-year projection"
+      - "Break down by: compute, storage, network, managed services"
+      - "Include cost optimization recommendations (Reserved Instances, Savings Plans)"
+    token_budget_hint: 1500
+    options: []
+
+  lift_shift_plan:
+    summary: "Planning lift-and-shift migration for {system_name}"
+    role: "architect"
+    intent: "Create detailed lift-and-shift migration plan for {system_name} to cloud IaaS"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define migration waves and sequencing"
+      - "Cutover plan with rollback procedures"
+      - "Data migration strategy and validation steps"
+    token_budget_hint: 1500
+    options: []
+
+  rearchitecture_plan:
+    summary: "Planning re-architecture of {system_name} for cloud-native"
+    role: "architect"
+    intent: "Create phased re-architecture plan to modernize {system_name} as cloud-native services"
+    phase: "PLANNING"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Identify strangler fig pattern opportunities"
+      - "Define phase milestones with business value at each phase"
+      - "Risk mitigation for each re-architecture phase"
+    token_budget_hint: 2000
+    options: []
+
+  network_design:
+    summary: "Designing network topology for {system_name}"
+    role: "architect"
+    intent: "Design secure, scalable network topology for {system_name} hybrid/cloud infrastructure"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Design VPC/VNet layout with subnets for each tier"
+      - "Security group and ACL rules for least-privilege"
+      - "Traffic flow diagrams for normal and failover scenarios"
+    token_budget_hint: 1800
+    options: []

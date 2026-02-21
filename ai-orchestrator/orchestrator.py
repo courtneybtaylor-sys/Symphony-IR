@@ -201,13 +201,16 @@ OPENAI_API_KEY=
 
 
 def cmd_init(args):
-    """Initialize .orchestrator/ directory."""
+    """Initialize .orchestrator/ directory, then run the setup wizard."""
     project_root = Path(args.project).resolve()
     orch_dir = project_root / ".orchestrator"
 
     if orch_dir.exists() and not args.force:
         print(f"Directory {orch_dir} already exists. Use --force to overwrite.")
-        return 1
+        # Still offer the wizard for credential updates
+        if getattr(args, "wizard", False):
+            _run_setup_wizard(force=True)
+        return 0
 
     # Create directory structure
     (orch_dir / "runs").mkdir(parents=True, exist_ok=True)
@@ -230,11 +233,31 @@ def cmd_init(args):
         print(f"  Created {env_file}")
 
     print(f"\nInitialized orchestrator at {orch_dir}")
-    print("\nNext steps:")
-    print(f"  1. Edit {env_file} with your API keys")
-    print(f"  2. Customize {agents_path} as needed")
-    print(f'  3. Run: python orchestrator.py run "your task here"')
+
+    # Launch interactive setup wizard (skipped if --no-wizard flag is set)
+    if not getattr(args, "no_wizard", False):
+        _run_setup_wizard(force=getattr(args, "wizard", False))
+    else:
+        print("\nNext steps:")
+        print(f"  1. Edit {env_file} with your API keys")
+        print(f"  2. Customize {agents_path} as needed")
+        print(f'  3. Run: python orchestrator.py run "your task here"')
+
     return 0
+
+
+def _run_setup_wizard(force: bool = False) -> None:
+    """Launch the CLI setup wizard, gracefully handling missing dependencies."""
+    try:
+        from setup_wizard_cli import run_wizard
+        run_wizard(force=force)
+    except ImportError as exc:
+        logger.debug(f"CLI wizard unavailable: {exc}")
+        # Fallback: print manual instructions
+        print("\nTo configure credentials, set environment variables:")
+        print("  ANTHROPIC_API_KEY=sk-ant-...")
+        print("  OLLAMA_BASE_URL=http://localhost:11434  (if using Ollama)")
+        print("Or edit .orchestrator/.env directly.")
 
 
 def cmd_run(args):
@@ -682,37 +705,75 @@ def _get_available_templates():
 
 
 def cmd_flow_list(args):
-    """List available flow templates."""
-    templates = _get_available_templates()
+    """List available flow templates, with optional domain/tag/search filtering."""
+    try:
+        from flow.template_registry import TemplateRegistry
+        registry = TemplateRegistry(Path(PACKAGE_DIR) / "flow" / "templates")
+    except ImportError:
+        return _cmd_flow_list_fallback(args)
+
+    # Apply filters
+    domain = getattr(args, "domain", None)
+    tag    = getattr(args, "tag", None)
+    search = getattr(args, "search", None)
+
+    if domain:
+        templates = registry.filter_by_domain(domain)
+        if not templates:
+            print(f"No templates found for domain: {domain}")
+            print(f"Available domains: {', '.join(registry.list_domains())}")
+            return 1
+    elif tag:
+        templates = registry.filter_by_tag(tag)
+        if not templates:
+            print(f"No templates found with tag: {tag}")
+            print(f"Available tags: {', '.join(registry.list_tags()[:20])}")
+            return 1
+    elif search:
+        templates = registry.search(search)
+        if not templates:
+            print(f"No templates matching: {search}")
+            return 1
+    else:
+        templates = registry.list_templates()
 
     if not templates:
         print("No flow templates found.")
         return 1
 
-    print("📚 Available Symphony Flow Templates:\n")
+    verbose = getattr(args, "verbose", False)
+    print(f"\n{registry.format_list(templates, verbose=verbose)}")
 
+    if not verbose:
+        domains_str = ", ".join(registry.list_domains())
+        print(f"Tip: --verbose for details  |  --domain <name>  |  --search <query>")
+        print(f"     Available domains: {domains_str}")
+
+    return 0
+
+
+def _cmd_flow_list_fallback(args):
+    """Fallback flow-list without template registry (no filtering)."""
+    templates = _get_available_templates()
+    if not templates:
+        print("No flow templates found.")
+        return 1
+
+    print("Available Symphony Flow Templates:\n")
     import yaml
-
     for template_name in templates:
-        template_path = (
-            Path(PACKAGE_DIR) / "flow" / "templates" / f"{template_name}.yaml"
-        )
+        template_path = Path(PACKAGE_DIR) / "flow" / "templates" / f"{template_name}.yaml"
         try:
             with open(template_path) as f:
                 data = yaml.safe_load(f)
-
-            name = data.get("name", template_name)
+            name        = data.get("name", template_name)
             description = data.get("description", "")
-            nodes = data.get("nodes", {})
-
-            print(f"🎯 {name} ({template_name})")
+            nodes       = data.get("nodes", {})
+            print(f"  {name} ({template_name})")
             print(f"   {description}")
-            print(f"   Nodes: {len(nodes)}")
-            print()
+            print(f"   Nodes: {len(nodes)}\n")
         except Exception as e:
-            print(f"⚠️  {template_name}: Error reading template ({str(e)})")
-            print()
-
+            print(f"  {template_name}: Error reading template ({e})\n")
     return 0
 
 
@@ -1009,6 +1070,14 @@ def main():
     init_parser.add_argument(
         "--force", action="store_true", help="Overwrite existing config"
     )
+    init_parser.add_argument(
+        "--wizard", action="store_true",
+        help="Force the interactive setup wizard even if already configured"
+    )
+    init_parser.add_argument(
+        "--no-wizard", dest="no_wizard", action="store_true",
+        help="Skip the interactive setup wizard"
+    )
 
     # run
     run_parser = subparsers.add_parser("run", help="Execute an orchestration run")
@@ -1111,6 +1180,26 @@ def main():
     # flow-list
     flow_list_parser = subparsers.add_parser(
         "flow-list", help="List available flow templates"
+    )
+    flow_list_parser.add_argument(
+        "--domain",
+        default=None,
+        help="Filter by domain (security, cloud, data, ml, performance, compliance)"
+    )
+    flow_list_parser.add_argument(
+        "--tag",
+        default=None,
+        help="Filter by tag (e.g. 'vulnerability', 'kubernetes', 'gdpr')"
+    )
+    flow_list_parser.add_argument(
+        "--search",
+        default=None,
+        help="Search templates by keyword in name, description, or tags"
+    )
+    flow_list_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show full metadata for each template"
     )
 
     # flow-status

@@ -1,0 +1,205 @@
+template_id: "ml_model"
+name: "ML Model Development"
+description: "Complete ML model lifecycle: problem definition, data preparation, model selection, evaluation, and deployment"
+domain: "ml"
+industry: "cross-industry"
+difficulty_level: "advanced"
+estimated_duration: "4-8 hours"
+tags: ["machine-learning", "mlops", "model-training", "evaluation", "deployment", "ai"]
+required_context: ["problem_statement", "dataset"]
+
+nodes:
+  start:
+    summary: "Starting ML model development for {problem_statement}"
+    role: "architect"
+    intent: "Design ML solution for: {problem_statement} using dataset: {dataset}"
+    phase: "PLANNING"
+    priority: 9
+    context_refs:
+      - "file:{dataset}"
+    constraints:
+      - "Define: ML task type (classification, regression, clustering, etc.)"
+      - "Identify: success metrics and business KPIs"
+      - "Assess: data availability, quality, and labeling requirements"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Supervised Learning"
+        description: "Labeled data available for classification or regression"
+        next_node_id: "data_preparation"
+      - id: "B"
+        label: "Unsupervised Learning"
+        description: "Pattern discovery, clustering, or anomaly detection"
+        next_node_id: "data_preparation"
+      - id: "C"
+        label: "Generative AI / Fine-Tuning"
+        description: "Fine-tune or prompt-engineer a foundation model"
+        next_node_id: "llm_strategy"
+
+  data_preparation:
+    summary: "Preparing training data for {problem_statement}"
+    role: "implementer"
+    intent: "Design and implement data preparation pipeline for ML training on {dataset}"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs:
+      - "file:{dataset}"
+    constraints:
+      - "Handle: missing values, outliers, class imbalance, duplicates"
+      - "Perform: exploratory data analysis (EDA) with key statistics"
+      - "Design: feature engineering and selection strategy"
+      - "Create: train/validation/test split with stratification if needed"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Classical ML Models"
+        description: "Gradient boosting, SVM, Random Forest baseline"
+        next_node_id: "model_selection"
+      - id: "B"
+        label: "Deep Learning Models"
+        description: "Neural networks for complex patterns in large datasets"
+        next_node_id: "deep_learning_design"
+
+  llm_strategy:
+    summary: "Designing generative AI strategy for {problem_statement}"
+    role: "architect"
+    intent: "Design the optimal LLM approach for {problem_statement}: RAG, fine-tuning, or prompt engineering"
+    phase: "PLANNING"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Evaluate: zero-shot vs few-shot vs fine-tuning tradeoffs"
+      - "Design: RAG pipeline if domain knowledge retrieval needed"
+      - "Define: evaluation metrics for generative quality (BLEU, ROUGE, human eval)"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "RAG Implementation"
+        description: "Retrieval-augmented generation with vector store"
+        next_node_id: "model_evaluation"
+      - id: "B"
+        label: "Fine-Tuning Pipeline"
+        description: "Dataset curation and fine-tuning workflow"
+        next_node_id: "data_preparation"
+
+  model_selection:
+    summary: "Selecting and training ML models for {problem_statement}"
+    role: "implementer"
+    intent: "Select, configure, and train baseline + optimized ML models for {problem_statement}"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Train: at least 3 candidate models with default hyperparameters"
+      - "Apply: cross-validation for reliable performance estimates"
+      - "Document: model assumptions, feature importances, training time"
+    token_budget_hint: 2500
+    options:
+      - id: "A"
+        label: "Hyperparameter Optimization"
+        description: "Grid search, random search, or Bayesian optimization"
+        next_node_id: "model_evaluation"
+      - id: "B"
+        label: "Evaluate Current Models"
+        description: "Compare models on validation set with business metrics"
+        next_node_id: "model_evaluation"
+
+  deep_learning_design:
+    summary: "Designing deep learning architecture for {problem_statement}"
+    role: "architect"
+    intent: "Design and implement neural network architecture for {problem_statement}"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Choose: architecture (CNN, RNN, Transformer, MLP) based on data type"
+      - "Design: regularization strategy (dropout, batch norm, weight decay)"
+      - "Define: training loop, optimizer, learning rate schedule"
+    token_budget_hint: 2500
+    options:
+      - id: "A"
+        label: "Train and Evaluate"
+        description: "Run training and analyze learning curves"
+        next_node_id: "model_evaluation"
+      - id: "B"
+        label: "Transfer Learning"
+        description: "Fine-tune pre-trained model for faster convergence"
+        next_node_id: "model_evaluation"
+
+  model_evaluation:
+    summary: "Evaluating ML models for {problem_statement}"
+    role: "reviewer"
+    intent: "Comprehensively evaluate trained models for {problem_statement} on held-out test set"
+    phase: "REVIEW"
+    priority: 10
+    context_refs: []
+    constraints:
+      - "Report: primary metric, secondary metrics, confusion matrix (if classification)"
+      - "Analyze: error patterns, failure modes, and bias/fairness metrics"
+      - "Test: robustness to distribution shift and adversarial examples"
+      - "Compare: model performance vs baseline and business requirements"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Deploy to Production"
+        description: "Model meets criteria — create deployment plan"
+        next_node_id: "deployment_plan"
+      - id: "B"
+        label: "Model Improvement Iteration"
+        description: "Performance gaps found — iterate on features or architecture"
+        next_node_id: "model_selection"
+      - id: "C"
+        label: "Model Card & Documentation"
+        description: "Create model card with intended use, limitations, and ethics"
+        next_node_id: "model_documentation"
+
+  deployment_plan:
+    summary: "Planning ML model deployment for {problem_statement}"
+    role: "architect"
+    intent: "Design production deployment strategy for trained model solving {problem_statement}"
+    phase: "SYNTHESIS"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Choose: serving strategy (REST API, batch inference, edge deployment)"
+      - "Design: A/B testing or shadow deployment rollout"
+      - "Define: monitoring for data drift, model degradation, prediction latency"
+      - "Plan: model versioning, rollback, and retraining triggers"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Create MLOps Pipeline"
+        description: "CI/CD pipeline for model training, validation, and deployment"
+        next_node_id: "mlops_pipeline"
+      - id: "B"
+        label: "Model Card & Documentation"
+        description: "Finalize documentation before release"
+        next_node_id: "model_documentation"
+
+  mlops_pipeline:
+    summary: "Building MLOps pipeline for {problem_statement}"
+    role: "implementer"
+    intent: "Create end-to-end MLOps pipeline for continuous model training and deployment"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Include: data versioning (DVC), experiment tracking (MLflow/W&B)"
+      - "Automated: retraining triggers on data drift or performance decay"
+      - "Deployment: containerized model serving with health checks"
+    token_budget_hint: 2500
+    options: []
+
+  model_documentation:
+    summary: "Creating model documentation and model card"
+    role: "integrator"
+    intent: "Write comprehensive model card and technical documentation for the trained model"
+    phase: "SYNTHESIS"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Model card: intended use, out-of-scope uses, training data, metrics"
+      - "Ethics: known biases, fairness analysis, environmental impact"
+      - "Technical: architecture, hyperparameters, dependencies, inference requirements"
+    token_budget_hint: 1500
+    options: []

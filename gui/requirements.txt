@@ -1,2 +1,21 @@
+# Symphony-IR Streamlit Web GUI Requirements
+# Run with: streamlit run gui/streamlit_app.py
+
+# Web UI framework
 streamlit>=1.38.0
+
+# Data handling
 pyyaml>=6.0.1
+
+# AI providers (used by the orchestrator subprocess)
+anthropic>=0.18.0
+openai>=1.0.0
+
+# HTTP client (Ollama API, health checks)
+requests>=2.31.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# CLI interaction (flow wizard)
+click>=8.1.0
