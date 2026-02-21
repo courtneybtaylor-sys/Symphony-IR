@@ -126,9 +126,22 @@ cd gui && streamlit run app.py
 
 ---
 
-## 📝 License
+## 📝 License & Patent Protection
 
-MIT License (Kheper LLC)
+Symphony-IR is released under the **Apache License 2.0** to enable:
+
+✅ **Wide adoption** — Use in commercial and non-commercial projects
+✅ **Derivative works** — Modify and build upon Symphony-IR
+✅ **Sublicensing** — Include in proprietary products
+✅ **Patent protection** — Explicit patent grant protects you and contributors (critical for AI/ML products)
+
+**What this means for you:**
+- You can use Symphony-IR in closed-source products
+- You must include the original license and copyright notice
+- You receive an explicit patent grant for AI/ML use cases
+- No warranties or liability (see [LICENSE.txt](LICENSE.txt) for details)
+
+For enterprise licensing, partnerships, or support: contact the maintainers
 
 ---
 
