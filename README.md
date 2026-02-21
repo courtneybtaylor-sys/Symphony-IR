@@ -9,9 +9,7 @@
 **Choose your path:**
 
 ### 👤 I want to use Symphony-IR now
-- **Windows:** [5-minute Windows setup](GETTING_STARTED_WINDOWS.md)
-- **macOS:** [5-minute macOS setup](GETTING_STARTED_MACOS.md)
-- **Linux:** [5-minute Linux setup](GETTING_STARTED_LINUX.md)
+- [Getting Started Guide](GETTING_STARTED.md) (Windows, macOS, Linux)
 
 ### 📚 I want to learn about it first
 - [Architecture & Features](docs/ARCHITECTURE.md)
@@ -95,9 +93,8 @@ cd gui && streamlit run app.py
 
 | Want to... | Read... |
 |------------|---------|
-| Set up on Windows | [GETTING_STARTED_WINDOWS.md](GETTING_STARTED_WINDOWS.md) |
-| Set up on macOS | [GETTING_STARTED_MACOS.md](GETTING_STARTED_MACOS.md) |
-| Set up on Linux | [GETTING_STARTED_LINUX.md](GETTING_STARTED_LINUX.md) |
+| Get started | [GETTING_STARTED.md](GETTING_STARTED.md) |
+| See new features | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) |
 | Understand how it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Use guided workflows | [docs/FLOW.md](docs/FLOW.md) |
 | Compare Claude vs Ollama | [docs/PROVIDERS.md](docs/PROVIDERS.md) |
@@ -135,4 +132,4 @@ MIT License (Kheper LLC)
 
 ---
 
-**Ready?** Pick your platform above and get started! → [Windows](GETTING_STARTED_WINDOWS.md) | [macOS](GETTING_STARTED_MACOS.md) | [Linux](GETTING_STARTED_LINUX.md)
+**Ready?** [Get started now →](GETTING_STARTED.md)
