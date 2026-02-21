@@ -1,0 +1,320 @@
+template_id: "performance_optimization"
+name: "Performance Optimization"
+description: "Systematic performance optimization workflow: profiling, bottleneck identification, optimization, and benchmarking"
+domain: "performance"
+industry: "technology"
+difficulty_level: "intermediate"
+estimated_duration: "2-4 hours"
+tags: ["performance", "optimization", "profiling", "benchmarking", "scalability", "latency", "throughput"]
+required_context: ["system_name", "performance_target"]
+
+nodes:
+  start:
+    summary: "Starting performance optimization of {system_name}"
+    role: "architect"
+    intent: "Optimize performance of {system_name} to meet target: {performance_target}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Define: current baseline metrics vs target SLOs"
+      - "Identify: performance dimensions to optimize (latency, throughput, memory, cost)"
+    token_budget_hint: 800
+    options:
+      - id: "A"
+        label: "Application Performance"
+        description: "Code-level bottlenecks, algorithms, caching"
+        next_node_id: "application_profiling"
+      - id: "B"
+        label: "Database / Query Performance"
+        description: "Slow queries, indexing, connection pooling"
+        next_node_id: "database_profiling"
+      - id: "C"
+        label: "Infrastructure / Scalability"
+        description: "Resource utilization, auto-scaling, load balancing"
+        next_node_id: "infrastructure_analysis"
+      - id: "D"
+        label: "Frontend / UX Performance"
+        description: "Bundle size, rendering, Core Web Vitals"
+        next_node_id: "frontend_profiling"
+
+  application_profiling:
+    summary: "Profiling {system_name} application code"
+    role: "researcher"
+    intent: "Profile {system_name} to identify CPU, memory, and I/O bottlenecks"
+    phase: "RESEARCH"
+    priority: 9
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Profile: CPU hotspots, memory allocations, I/O wait times"
+      - "Use: flame graphs, call trees, memory profilers"
+      - "Reproduce: performance issue under realistic load"
+      - "Focus on: top 20% of code causing 80% of overhead"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Algorithm Optimization"
+        description: "Replace inefficient algorithms or data structures"
+        next_node_id: "algorithm_optimization"
+      - id: "B"
+        label: "Caching Strategy"
+        description: "Implement multi-level caching to reduce computation"
+        next_node_id: "caching_strategy"
+      - id: "C"
+        label: "Async / Concurrency"
+        description: "Parallelize I/O-bound or CPU-bound workloads"
+        next_node_id: "concurrency_optimization"
+
+  database_profiling:
+    summary: "Analyzing database performance for {system_name}"
+    role: "researcher"
+    intent: "Identify and resolve database performance bottlenecks in {system_name}"
+    phase: "RESEARCH"
+    priority: 9
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Analyze: slow query log, EXPLAIN plans, index usage statistics"
+      - "Check: N+1 queries, table scans, lock contention"
+      - "Review: connection pool sizing and query patterns"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Query Optimization"
+        description: "Rewrite queries, add indexes, partition tables"
+        next_node_id: "query_optimization"
+      - id: "B"
+        label: "Database Architecture"
+        description: "Read replicas, sharding, caching layer"
+        next_node_id: "database_architecture"
+
+  infrastructure_analysis:
+    summary: "Analyzing infrastructure scalability for {system_name}"
+    role: "architect"
+    intent: "Analyze infrastructure capacity and scalability for {system_name} under target load"
+    phase: "RESEARCH"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Review: resource utilization (CPU, memory, network, disk I/O)"
+      - "Identify: saturation points and scaling bottlenecks"
+      - "Check: load balancer configuration, auto-scaling policies"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Vertical Scaling Plan"
+        description: "Right-size instances or increase resource limits"
+        next_node_id: "scaling_plan"
+      - id: "B"
+        label: "Horizontal Scaling Plan"
+        description: "Scale out with load balancing and stateless design"
+        next_node_id: "scaling_plan"
+      - id: "C"
+        label: "Cost Optimization"
+        description: "Reduce infrastructure cost while meeting performance targets"
+        next_node_id: "cost_optimization"
+
+  frontend_profiling:
+    summary: "Profiling {system_name} frontend performance"
+    role: "researcher"
+    intent: "Analyze and optimize {system_name} frontend for Core Web Vitals and perceived performance"
+    phase: "RESEARCH"
+    priority: 8
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Measure: LCP, FID/INP, CLS, TTFB using Lighthouse or WebPageTest"
+      - "Analyze: bundle size, unused JavaScript, render-blocking resources"
+      - "Check: image optimization, font loading, CDN usage"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Bundle Optimization"
+        description: "Code splitting, tree shaking, lazy loading"
+        next_node_id: "bundle_optimization"
+      - id: "B"
+        label: "Rendering Optimization"
+        description: "Virtual DOM, memoization, server-side rendering"
+        next_node_id: "rendering_optimization"
+
+  algorithm_optimization:
+    summary: "Optimizing algorithms in {system_name}"
+    role: "implementer"
+    intent: "Replace or optimize inefficient algorithms and data structures in {system_name}"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Document: before/after Big-O complexity for each change"
+      - "Write: benchmarks proving improvement with realistic data sizes"
+      - "Maintain: test coverage and correctness after refactoring"
+    token_budget_hint: 2500
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Measure improvement against original baseline"
+        next_node_id: "benchmarking"
+
+  caching_strategy:
+    summary: "Implementing caching strategy for {system_name}"
+    role: "architect"
+    intent: "Design and implement multi-level caching strategy to improve {system_name} performance"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Define: cache layers (in-process, distributed, CDN)"
+      - "Set: TTL, eviction policy, and cache invalidation strategy"
+      - "Address: cache stampede and thundering herd prevention"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Measure cache hit rates and latency improvement"
+        next_node_id: "benchmarking"
+
+  concurrency_optimization:
+    summary: "Optimizing concurrency in {system_name}"
+    role: "implementer"
+    intent: "Improve {system_name} throughput via async I/O, thread pools, or parallel processing"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Identify: I/O-bound vs CPU-bound workloads for appropriate strategy"
+      - "Implement: async/await, worker pools, or batch processing"
+      - "Test: thread safety, deadlock prevention, backpressure handling"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Measure throughput and latency under concurrency"
+        next_node_id: "benchmarking"
+
+  query_optimization:
+    summary: "Optimizing database queries for {system_name}"
+    role: "implementer"
+    intent: "Optimize slow database queries and indexing strategy for {system_name}"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Rewrite: inefficient queries with EXPLAIN-guided optimization"
+      - "Add: covering indexes, composite indexes, partial indexes as needed"
+      - "Remove: N+1 patterns via eager loading or batching"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Compare query execution time before/after optimization"
+        next_node_id: "benchmarking"
+
+  database_architecture:
+    summary: "Redesigning database architecture for {system_name}"
+    role: "architect"
+    intent: "Design scalable database architecture for {system_name} to meet {performance_target}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Evaluate: read replicas, connection pooling (PgBouncer), caching layers"
+      - "Consider: CQRS pattern, denormalization, or NoSQL for read-heavy workloads"
+      - "Define: migration plan from current to target architecture"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Load test new architecture against performance targets"
+        next_node_id: "benchmarking"
+
+  scaling_plan:
+    summary: "Creating scaling plan for {system_name}"
+    role: "architect"
+    intent: "Design scaling strategy to meet performance targets for {system_name}"
+    phase: "SYNTHESIS"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define: scaling triggers (CPU %, request rate, queue depth)"
+      - "Test: auto-scaling behavior under load and scale-in scenarios"
+      - "Document: steady-state and peak capacity requirements"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Load test scaling behavior under realistic traffic"
+        next_node_id: "benchmarking"
+
+  cost_optimization:
+    summary: "Optimizing infrastructure costs for {system_name}"
+    role: "researcher"
+    intent: "Identify cost reduction opportunities for {system_name} without sacrificing performance targets"
+    phase: "RESEARCH"
+    priority: 6
+    context_refs: []
+    constraints:
+      - "Analyze: idle resources, over-provisioned instances, unused services"
+      - "Recommend: Savings Plans, spot instances, right-sizing"
+      - "Maintain: performance SLOs while reducing costs"
+    token_budget_hint: 1200
+    options: []
+
+  bundle_optimization:
+    summary: "Optimizing JavaScript bundle for {system_name}"
+    role: "implementer"
+    intent: "Reduce {system_name} JavaScript bundle size and improve loading performance"
+    phase: "IMPLEMENTATION"
+    priority: 7
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Implement: route-based code splitting, dynamic imports"
+      - "Remove: unused dependencies (tree shaking)"
+      - "Optimize: images, fonts, and static assets"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Run Lighthouse before/after to measure improvement"
+        next_node_id: "benchmarking"
+
+  rendering_optimization:
+    summary: "Optimizing rendering performance for {system_name}"
+    role: "implementer"
+    intent: "Optimize component rendering and interactions in {system_name} for smooth 60fps experience"
+    phase: "IMPLEMENTATION"
+    priority: 7
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Implement: React.memo, useMemo, useCallback for expensive components"
+      - "Virtualize: long lists with windowing (react-window)"
+      - "Optimize: layout thrashing and forced reflows"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Benchmark and Validate"
+        description: "Profile rendering with React DevTools and Chrome Performance"
+        next_node_id: "benchmarking"
+
+  benchmarking:
+    summary: "Benchmarking {system_name} performance improvements"
+    role: "reviewer"
+    intent: "Measure and document performance improvement in {system_name} against baseline"
+    phase: "REVIEW"
+    priority: 9
+    context_refs:
+      - "file:{system_name}"
+    constraints:
+      - "Compare: before/after metrics with statistical significance"
+      - "Test: under realistic production-like load"
+      - "Document: benchmark methodology, environment, and results"
+      - "Verify: {performance_target} has been met"
+    token_budget_hint: 1500
+    options: []

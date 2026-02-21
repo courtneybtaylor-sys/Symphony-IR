@@ -1,0 +1,190 @@
+template_id: "data_pipeline"
+name: "Data Pipeline Design"
+description: "End-to-end data pipeline workflow: source identification, transformation, quality checks, and deployment"
+domain: "data"
+industry: "cross-industry"
+difficulty_level: "intermediate"
+estimated_duration: "2-4 hours"
+tags: ["data", "etl", "pipeline", "ingestion", "transformation", "analytics", "streaming"]
+required_context: ["pipeline_name", "data_source"]
+
+nodes:
+  start:
+    summary: "Designing data pipeline for {pipeline_name}"
+    role: "architect"
+    intent: "Design data pipeline for {pipeline_name} from {data_source}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{data_source}"
+    constraints:
+      - "Identify: data volume, velocity, variety (batch vs streaming)"
+      - "Define: latency SLAs, retention policies, access patterns"
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "Batch Pipeline"
+        description: "Scheduled batch processing for high-volume data"
+        next_node_id: "batch_design"
+      - id: "B"
+        label: "Streaming Pipeline"
+        description: "Real-time event-driven pipeline with low latency"
+        next_node_id: "streaming_design"
+      - id: "C"
+        label: "Lambda Architecture"
+        description: "Hybrid batch + speed layer for comprehensive analytics"
+        next_node_id: "lambda_design"
+
+  batch_design:
+    summary: "Designing batch data pipeline for {pipeline_name}"
+    role: "architect"
+    intent: "Design batch ETL pipeline for {pipeline_name} processing data from {data_source}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "file:{data_source}"
+    constraints:
+      - "Choose: Spark, dbt, Airflow/Prefect/Dagster orchestration"
+      - "Design: extraction, transformation, loading phases"
+      - "Define: partitioning strategy and incremental load logic"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Implement Transformation Logic"
+        description: "Write SQL/PySpark transforms and business rules"
+        next_node_id: "transformation_logic"
+      - id: "B"
+        label: "Design Data Quality Checks"
+        description: "Build validation framework for data correctness"
+        next_node_id: "quality_checks"
+
+  streaming_design:
+    summary: "Designing streaming pipeline for {pipeline_name}"
+    role: "architect"
+    intent: "Design real-time streaming pipeline for {pipeline_name} using event-driven architecture"
+    phase: "PLANNING"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Choose: Kafka, Kinesis, Pub/Sub as message backbone"
+      - "Choose: Flink, Spark Streaming, or cloud stream processors"
+      - "Design: exactly-once semantics, watermarking, windowing"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Implement Stream Processing"
+        description: "Write streaming processing logic with windowing"
+        next_node_id: "transformation_logic"
+      - id: "B"
+        label: "Design Backpressure Handling"
+        description: "Handle consumer lag and throughput spikes"
+        next_node_id: "quality_checks"
+
+  lambda_design:
+    summary: "Designing Lambda architecture for {pipeline_name}"
+    role: "architect"
+    intent: "Design Lambda architecture combining batch and streaming layers for {pipeline_name}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Batch layer: immutable master dataset with recomputation"
+      - "Speed layer: real-time incremental processing"
+      - "Serving layer: merged views for queries"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Implement Both Layers"
+        description: "Build batch and streaming processing logic"
+        next_node_id: "transformation_logic"
+      - id: "B"
+        label: "Consider Kappa Architecture"
+        description: "Evaluate simplifying to streaming-only approach"
+        next_node_id: "streaming_design"
+
+  transformation_logic:
+    summary: "Implementing transformation logic for {pipeline_name}"
+    role: "implementer"
+    intent: "Write data transformation code for {pipeline_name} including business rules and enrichment"
+    phase: "IMPLEMENTATION"
+    priority: 9
+    context_refs:
+      - "file:{data_source}"
+    constraints:
+      - "Write idempotent, testable transformation functions"
+      - "Document data lineage for each transformation step"
+      - "Handle: nulls, duplicates, schema evolution, late data"
+    token_budget_hint: 2500
+    options:
+      - id: "A"
+        label: "Add Data Quality Checks"
+        description: "Integrate validation into the pipeline"
+        next_node_id: "quality_checks"
+      - id: "B"
+        label: "Write Unit Tests"
+        description: "Test transformation logic with sample data"
+        next_node_id: "pipeline_tests"
+
+  quality_checks:
+    summary: "Designing data quality framework for {pipeline_name}"
+    role: "implementer"
+    intent: "Build comprehensive data quality checks for {pipeline_name} using Great Expectations or dbt tests"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Implement: completeness, uniqueness, validity, consistency checks"
+      - "Set: thresholds for acceptable error rates"
+      - "Define: quarantine and alerting logic for failed records"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Create Monitoring Dashboard"
+        description: "Build observability for pipeline health and data quality"
+        next_node_id: "monitoring_setup"
+      - id: "B"
+        label: "Generate Deployment Plan"
+        description: "CI/CD pipeline and infrastructure for deployment"
+        next_node_id: "deployment_plan"
+
+  pipeline_tests:
+    summary: "Writing tests for {pipeline_name} data pipeline"
+    role: "implementer"
+    intent: "Create unit, integration, and end-to-end tests for {pipeline_name} data pipeline"
+    phase: "IMPLEMENTATION"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Unit tests: individual transformation functions with fixtures"
+      - "Integration tests: end-to-end with sample data snapshots"
+      - "Test for: edge cases, malformed data, schema changes"
+    token_budget_hint: 2000
+    options: []
+
+  monitoring_setup:
+    summary: "Setting up monitoring for {pipeline_name}"
+    role: "architect"
+    intent: "Design observability stack for {pipeline_name} pipeline health, latency, and data quality"
+    phase: "IMPLEMENTATION"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Metrics: throughput, latency, error rate, lag"
+      - "Alerting: SLA breaches, data quality failures, pipeline stalls"
+      - "Tools: Prometheus/Grafana, DataDog, or cloud-native monitoring"
+    token_budget_hint: 1200
+    options: []
+
+  deployment_plan:
+    summary: "Creating deployment plan for {pipeline_name}"
+    role: "architect"
+    intent: "Design CI/CD and infrastructure deployment plan for {pipeline_name} data pipeline"
+    phase: "SYNTHESIS"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define: dev/staging/prod environments with data isolation"
+      - "Create: IaC for pipeline infrastructure"
+      - "Define: blue/green or canary deployment strategy"
+    token_budget_hint: 1500
+    options: []
