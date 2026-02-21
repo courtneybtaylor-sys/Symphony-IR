@@ -4,12 +4,12 @@
 # separately by the orchestrator init script. This file contains ONLY
 # the GUI dependencies to keep installation simple.
 
-# UI Framework
-PyQt6==6.6.1
-PyQt6-Charts==6.6.0
+# UI Framework — use >= to allow patch upgrades
+PyQt6>=6.6.1
+PyQt6-Charts>=6.6.0
 
 # Security — credential storage in system Credential Manager
-keyring==24.3.0
+keyring>=24.3.0
 
-# Optional: For building standalone Windows executable
-PyInstaller>=6.1.0
+# NOTE: PyInstaller (for building standalone executables) is in
+# requirements-build.txt — it is NOT needed to run Symphony-IR.

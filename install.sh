@@ -142,8 +142,8 @@ echo -e "${BLUE}5️⃣  Installing dependencies...${NC}"
 echo "   (This may take 2-5 minutes)"
 echo ""
 
-# Upgrade pip first
-python3 -m pip install --upgrade pip setuptools wheel --quiet
+# Upgrade pip (best-effort — system-managed pip may not be upgradeable)
+python3 -m pip install --upgrade pip --quiet 2>/dev/null || true
 
 # Install core dependencies
 echo "   Installing core packages..."
@@ -186,9 +186,7 @@ echo ""
 echo -e "${BLUE}6️⃣  Initializing Orchestra...${NC}"
 
 if [ -f "ai-orchestrator/orchestrator.py" ]; then
-    cd ai-orchestrator
-    python3 orchestrator.py init --force 2>/dev/null || true
-    cd ..
+    python3 ai-orchestrator/orchestrator.py init --project . --force 2>/dev/null || true
     echo -e "${GREEN}✅ Orchestrator initialized${NC}"
 else
     echo -e "${YELLOW}⚠️  Orchestrator not found (expected if not in project root)${NC}"
@@ -207,14 +205,16 @@ if [[ "$PROVIDERS" == "anthropic" ]] || [[ "$PROVIDERS" == "both" ]] || [[ "$PRO
         if [[ "$api_key" != "skip" && ! -z "$api_key" ]]; then
             export ANTHROPIC_API_KEY="$api_key"
 
-            # Create/update .env file
-            if [ -f ".env" ]; then
+            # Write to .orchestrator/.env (where orchestrator.py reads it from)
+            mkdir -p .orchestrator
+            env_target=".orchestrator/.env"
+            if [ -f "$env_target" ]; then
                 # Remove old key if present
-                sed -i '' '/^ANTHROPIC_API_KEY=/d' .env 2>/dev/null || sed -i '/^ANTHROPIC_API_KEY=/d' .env
+                sed -i '/^ANTHROPIC_API_KEY=/d' "$env_target"
             fi
-            echo "ANTHROPIC_API_KEY=$api_key" >> .env
+            echo "ANTHROPIC_API_KEY=$api_key" >> "$env_target"
 
-            echo -e "${GREEN}✅ API key saved to .env${NC}"
+            echo -e "${GREEN}✅ API key saved to $env_target${NC}"
         fi
     else
         echo "   You can add your API key later by running:"

@@ -148,7 +148,10 @@ echo    (This may take 2-5 minutes)
 echo.
 
 echo Upgrading pip...
-python -m pip install --upgrade pip setuptools wheel --quiet
+python -m pip install --upgrade pip --quiet 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo ⚠️  pip upgrade skipped — continuing with existing version
+)
 
 echo Installing core packages...
 python -m pip install pyyaml python-dotenv --quiet
@@ -183,15 +186,16 @@ REM Step 7: Initialize orchestrator
 echo 6️⃣  Initializing Orchestrator...
 
 if exist "ai-orchestrator\orchestrator.py" (
-    cd ai-orchestrator
-    python orchestrator.py init --force >nul 2>&1
-    cd ..
+    python ai-orchestrator\orchestrator.py init --project . --force >nul 2>&1
     echo ✅ Orchestrator initialized
 ) else (
     echo ⚠️  Orchestrator not found (expected if not in project root)
 )
 
 echo.
+
+REM Helper: write API key to .orchestrator\.env (where orchestrator reads it)
+REM  Called after orchestrator init, so .orchestrator\ already exists.
 
 REM Step 8: API key configuration (if Claude selected)
 if "!PROVIDERS!"=="anthropic" (
@@ -203,10 +207,11 @@ if "!PROVIDERS!"=="anthropic" (
 
         if not "!API_KEY!"=="skip" (
             if not "!API_KEY!"=="" (
+                if not exist ".orchestrator" mkdir .orchestrator
                 (
                     echo ANTHROPIC_API_KEY=!API_KEY!
-                ) > .env
-                echo ✅ API key saved to .env
+                ) > .orchestrator\.env
+                echo ✅ API key saved to .orchestrator\.env
             )
         )
     ) else (
@@ -224,10 +229,11 @@ if "!PROVIDERS!"=="anthropic" (
 
         if not "!API_KEY!"=="skip" (
             if not "!API_KEY!"=="" (
+                if not exist ".orchestrator" mkdir .orchestrator
                 (
                     echo ANTHROPIC_API_KEY=!API_KEY!
-                ) > .env
-                echo ✅ API key saved to .env
+                ) > .orchestrator\.env
+                echo ✅ API key saved to .orchestrator\.env
             )
         )
     ) else (
@@ -243,10 +249,11 @@ if "!PROVIDERS!"=="anthropic" (
 
         if not "!API_KEY!"=="skip" (
             if not "!API_KEY!"=="" (
+                if not exist ".orchestrator" mkdir .orchestrator
                 (
                     echo ANTHROPIC_API_KEY=!API_KEY!
-                ) > .env
-                echo ✅ API key saved to .env
+                ) > .orchestrator\.env
+                echo ✅ API key saved to .orchestrator\.env
             )
         )
     )
@@ -323,7 +330,7 @@ color 2F
 echo.
 echo ╔════════════════════════════════════════════════════════╗
 echo ║              Setup Complete! ✅                         ║
-echo "╚════════════════════════════════════════════════════════╝"
+echo ╚════════════════════════════════════════════════════════╝
 echo.
 echo 📍 What's next?
 echo    1. Open Symphony-IR

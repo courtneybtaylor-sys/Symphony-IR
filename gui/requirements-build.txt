@@ -1,0 +1,8 @@
+# Build-only requirements — used to create standalone executables.
+# DO NOT install these for regular use.
+#
+# Usage:
+#   pip install -r requirements-build.txt
+#   pyinstaller gui/main.py --onefile --windowed --name Symphony-IR
+
+PyInstaller>=6.1.0
