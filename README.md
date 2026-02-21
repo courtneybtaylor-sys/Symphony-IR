@@ -89,19 +89,24 @@ cd gui && streamlit run app.py
 
 ---
 
-## 📖 Learn More
+## 📖 Documentation
+
+All documentation is organized in the [`docs/`](docs/) directory. Here's where to find what you need:
 
 | Want to... | Read... |
 |------------|---------|
-| Get started | [GETTING_STARTED.md](GETTING_STARTED.md) |
-| See new features | [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) |
-| Understand how it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Use guided workflows | [docs/FLOW.md](docs/FLOW.md) |
-| Compare Claude vs Ollama | [docs/PROVIDERS.md](docs/PROVIDERS.md) |
-| Use the CLI | [docs/CLI.md](docs/CLI.md) |
-| Troubleshoot issues | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
-| See code examples | [docs/EXAMPLES.md](docs/EXAMPLES.md) |
-| Contribute code | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Get started** | [Getting Started](GETTING_STARTED.md) |
+| **Learn the architecture** | [Architecture Overview](docs/ARCHITECTURE.md) |
+| **Use the CLI** | [CLI Guide](docs/USAGE/CLI.md) |
+| **Use the GUI** | [GUI Guide](docs/USAGE/GUI.md) |
+| **Use as a Python library** | [Python API](docs/USAGE/PYTHON_API.md) |
+| **Understand workflows** | [Templates Guide](docs/USAGE/TEMPLATES.md) |
+| **Set up for development** | [Development Setup](docs/DEVELOPMENT/SETUP.md) |
+| **Contribute code** | [Contributing Guide](CONTRIBUTING.md) |
+| **View the roadmap** | [Project Roadmap](ROADMAP.md) |
+| **Report security issues** | [Security Policy](SECURITY.md) |
+
+**👉 [Full Documentation Hub →](docs/)**
 
 ---
 
