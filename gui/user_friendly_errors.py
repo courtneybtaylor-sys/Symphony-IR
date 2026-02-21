@@ -4,12 +4,16 @@ User-Friendly Error Messages for Symphony-IR
 Converts technical errors into plain English with actionable suggestions and help links.
 """
 
+import os
 import re
 import logging
-from typing import Dict, Tuple, Optional
+import platform
+from typing import Dict, Optional
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+_OS = platform.system()   # 'Windows', 'Darwin', 'Linux'
 
 
 class ErrorSeverity(Enum):
@@ -79,145 +83,367 @@ class UserFriendlyError:
 class ErrorTranslator:
     """Translate technical errors to user-friendly messages."""
 
-    # Error patterns and their user-friendly equivalents
+    # Error patterns and their user-friendly equivalents.
+    # Ordered from most-specific to most-general — first match wins.
     ERROR_MAPPINGS = {
-        # API Key errors
+        # ── API Key ───────────────────────────────────────────────────────────
         r"ANTHROPIC_API_KEY": {
-            "title": "API Key Not Found",
+            "title": "API Key Not Set",
             "message": "Symphony-IR couldn't find your Anthropic API key.",
             "suggestions": [
-                "Go to Settings and add your API key (get one at https://console.anthropic.com)",
-                "Or switch to Ollama for free local AI models (Settings → Provider: Ollama)",
-                "Click the help icon next to API Key for detailed instructions",
+                "Go to Settings and paste your API key",
+                "Get a free key at https://console.anthropic.com",
+                "Or switch to Ollama (Settings → Provider: Ollama) for free local AI",
             ],
             "help_link": "https://console.anthropic.com/account/api-keys",
+            "severity": ErrorSeverity.ERROR,
         },
-
-        r"api_key.*invalid|invalid.*api|401|Unauthorized": {
-            "title": "API Key Invalid",
-            "message": "Your API key isn't working. It may be incorrect, expired, or disabled.",
+        r"api_key.*invalid|invalid.*api_key|AuthenticationError": {
+            "title": "API Key Rejected",
+            "message": "Your API key was rejected. It may be wrong, expired, or disabled.",
             "suggestions": [
-                "Double-check your API key (copy from https://console.anthropic.com)",
-                "Make sure there are no extra spaces or characters",
-                "Check that your account is active and not suspended",
-                "Try getting a new key from the Anthropic console",
+                "Copy your key exactly from https://console.anthropic.com",
+                "Make sure there are no extra spaces before or after the key",
+                "Check that your account hasn't been suspended",
+                "Create a new key if yours is expired",
             ],
             "help_link": "https://console.anthropic.com/account/api-keys",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"401|Unauthorized": {
+            "title": "Not Authorized",
+            "message": "The AI service rejected the request — your credentials may be wrong.",
+            "suggestions": [
+                "Re-enter your API key in Settings",
+                "Confirm the key has not expired",
+                "If using a custom endpoint, verify the URL and credentials",
+            ],
+            "help_link": "https://console.anthropic.com/account/api-keys",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"429|rate.?limit|RateLimitError|too many requests": {
+            "title": "Rate Limit Hit",
+            "message": "You've sent too many requests to the AI service in a short time.",
+            "suggestions": [
+                "Wait 30–60 seconds and try again",
+                "Reduce the number of parallel agents in Settings",
+                "Check your plan limits at https://console.anthropic.com",
+                "Consider upgrading to a higher-tier plan for more capacity",
+            ],
+            "help_link": "https://docs.anthropic.com/claude/reference/rate-limits",
+            "severity": ErrorSeverity.WARNING,
+        },
+        r"402|Payment Required|billing|quota exceeded|insufficient_quota": {
+            "title": "Account Billing Issue",
+            "message": "Your account has run out of credits or has a billing problem.",
+            "suggestions": [
+                "Add credits to your account at https://console.anthropic.com/billing",
+                "Check your usage limits and billing status",
+                "Or switch to Ollama (free, local) in Settings",
+            ],
+            "help_link": "https://console.anthropic.com/billing",
+            "severity": ErrorSeverity.CRITICAL,
         },
 
-        # Connection errors
-        r"Connection refused|Failed to connect|ECONNREFUSED": {
-            "title": "Can't Connect to AI Service",
-            "message": "Symphony-IR couldn't reach the AI service.",
+        # ── Network / Connectivity ─────────────────────────────────────────────
+        r"Connection refused|Failed to connect|ECONNREFUSED|ConnectionRefusedError": {
+            "title": "Connection Refused",
+            "message": "Symphony-IR couldn't reach the AI service — nothing is listening at that address.",
             "suggestions": [
                 "If using Claude: Check your internet connection",
-                "If using Ollama: Make sure Ollama is running (run 'ollama serve')",
-                "Check that the service is running on the correct address",
-                "Try restarting the service and try again",
+                "If using Ollama: Start it by running 'ollama serve'",
+                "Confirm the service URL in Settings is correct",
+                "Check your firewall isn't blocking the connection",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/docs/TROUBLESHOOTING.md",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.ERROR,
         },
-
-        r"timeout|timed out|ETIMEDOUT": {
+        r"timeout|timed out|ETIMEDOUT|ReadTimeoutError|ConnectTimeout": {
             "title": "Request Timed Out",
             "message": "The AI service took too long to respond.",
             "suggestions": [
-                "The service might be overloaded - try again in a moment",
-                "If using Ollama: Your computer might not be fast enough - try a smaller model",
-                "If using Claude: Your internet connection might be slow",
-                "Check that your internet connection is stable",
+                "The service may be busy — wait a moment and try again",
+                "If using Ollama: A smaller model (mistral) responds faster",
+                "Check your internet connection speed",
+                "Increase the timeout in Settings if you're running large tasks",
             ],
-            "help_link": "https://docs.anthropic.com/troubleshooting",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.WARNING,
         },
-
-        # Ollama errors
-        r"ollama|OLLAMA": {
-            "title": "Ollama Connection Problem",
-            "message": "Symphony-IR couldn't connect to your Ollama server.",
+        r"SSL|CERTIFICATE_VERIFY_FAILED|ssl.SSLError": {
+            "title": "SSL / HTTPS Problem",
+            "message": "There's a security certificate problem with the connection.",
             "suggestions": [
-                "Make sure Ollama is installed: https://ollama.ai",
-                "Start Ollama by running: ollama serve",
-                "Check the Ollama URL in Settings matches your setup",
-                "If Ollama is on another computer, update the URL to that address",
-                "If using default: Should be http://localhost:11434",
+                "Check your system date and time are correct",
+                "Update your Python SSL certificates: pip install --upgrade certifi",
+                "If behind a corporate proxy, ask IT to whitelist the AI service",
+                "Try connecting from a different network",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/docs/OLLAMA.md",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#ssl",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"Name or service not known|Temporary failure in name resolution|getaddrinfo": {
+            "title": "DNS / Internet Problem",
+            "message": "Symphony-IR can't reach the internet — DNS lookup failed.",
+            "suggestions": [
+                "Check that your computer is connected to the internet",
+                "Try opening a browser to test connectivity",
+                "Restart your router or switch to a different network",
+                "Or use Ollama (local AI) — no internet needed",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"ProxyError|407|proxy": {
+            "title": "Proxy Configuration Problem",
+            "message": "The connection is failing because of a proxy server.",
+            "suggestions": [
+                "Configure HTTPS_PROXY environment variable if behind a corporate proxy",
+                "Ask your IT team for the correct proxy settings",
+                "Or connect directly without a proxy if possible",
+                "Use Ollama for completely offline/local AI",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#proxy",
+            "severity": ErrorSeverity.ERROR,
         },
 
-        # Python/Environment errors
-        r"ModuleNotFoundError|ImportError": {
-            "title": "Missing Software",
-            "message": "Some required software is not installed.",
+        # ── Ollama ────────────────────────────────────────────────────────────
+        r"ollama.*not.*found|pull.*model|model.*not.*found.*ollama": {
+            "title": "Ollama Model Not Downloaded",
+            "message": "The Ollama model you selected hasn't been downloaded yet.",
+            "suggestions": [
+                "Download it by running: ollama pull mistral",
+                "Or: ollama pull llama2",
+                "See available models at: https://ollama.ai/library",
+                "After downloading, try your task again",
+            ],
+            "help_link": "https://ollama.ai/library",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"ollama|OLLAMA_BASE_URL|localhost:11434": {
+            "title": "Ollama Not Running",
+            "message": "Symphony-IR couldn't connect to Ollama at localhost:11434.",
+            "suggestions": [
+                "Start Ollama: open a terminal and run 'ollama serve'",
+                "Check Ollama is installed from https://ollama.ai",
+                "Verify the Ollama URL in Settings (default: http://localhost:11434)",
+                "If Ollama is on another machine, update the URL in Settings",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/PROVIDERS.md#ollama",
+            "severity": ErrorSeverity.ERROR,
+        },
+
+        # ── Python / Environment ──────────────────────────────────────────────
+        r"No module named '(.*)'|ModuleNotFoundError: No module": {
+            "title": "Missing Python Package",
+            "message": "A required Python package is not installed.",
             "suggestions": [
                 "Run: pip install -r gui/requirements-desktop.txt",
-                "Or run the Windows installer again",
-                "If you built from source, reinstall dependencies",
+                "Or run the platform installer script again",
+                "If you see a specific package name in the error, install it: pip install <package>",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR#installation",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#dependencies",
+            "severity": ErrorSeverity.CRITICAL,
+        },
+        r"ImportError|cannot import name": {
+            "title": "Import Error",
+            "message": "A Python module failed to load — the package may be the wrong version.",
+            "suggestions": [
+                "Run: pip install -r gui/requirements-desktop.txt --upgrade",
+                "Try creating a fresh virtual environment",
+                "Ensure you're using Python 3.9 or higher",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#dependencies",
+            "severity": ErrorSeverity.CRITICAL,
+        },
+        r"python.*version|requires python|python 3\.[0-8]": {
+            "title": "Python Version Too Old",
+            "message": "Symphony-IR requires Python 3.9 or newer.",
+            "suggestions": [
+                "Download Python 3.11 from https://python.org",
+                "Install it and re-run the Symphony-IR installer",
+                "Check your version: python --version",
+            ],
+            "help_link": "https://www.python.org/downloads/",
+            "severity": ErrorSeverity.CRITICAL,
         },
 
-        # File system errors
+        # ── File System ───────────────────────────────────────────────────────
+        r"No such file or directory.*orchestrator|orchestrator.*not found": {
+            "title": "Orchestrator Not Found",
+            "message": "The orchestrator.py script couldn't be found at the expected path.",
+            "suggestions": [
+                "Make sure you cloned or extracted Symphony-IR completely",
+                "Check the 'Project Directory' in Settings points to your Symphony-IR folder",
+                "Re-download Symphony-IR if files are missing",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.CRITICAL,
+        },
         r"No such file|FileNotFoundError|ENOENT": {
             "title": "File Not Found",
             "message": "Symphony-IR couldn't find a required file or directory.",
             "suggestions": [
-                "Make sure the project directory is correct (Settings tab)",
-                "Try reinitializing the project: python orchestrator.py init --project .",
-                "Check that you have permission to access the file",
-                "Restart Symphony-IR and try again",
+                "Check the project directory in Settings is correct",
+                "Initialize the project: python orchestrator.py init --project .",
+                "Make sure the file path doesn't contain special characters",
+                "Try restarting Symphony-IR",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR#troubleshooting",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.ERROR,
         },
-
-        r"Permission denied|PermissionError|EACCES": {
-            "title": "Permission Problem",
-            "message": "Symphony-IR doesn't have permission to access a file or directory.",
+        r"Permission denied|PermissionError|EACCES|Access is denied": {
+            "title": "Permission Denied",
+            "message": "Symphony-IR doesn't have permission to read or write a file.",
             "suggestions": [
-                "Try running Symphony-IR as Administrator",
-                "Check that you own the .orchestrator directory",
-                "Make sure the file isn't read-only",
-                "Try saving to a different directory",
+                "Run Symphony-IR as Administrator (Windows) or with sudo (Mac/Linux)",
+                "Check that the .orchestrator folder isn't owned by a different user",
+                "Make sure the file or folder isn't marked read-only",
+                "Try moving your project to a folder you own (e.g. Documents)",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/docs/WINDOWS-SETUP.md",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#permissions",
+            "severity": ErrorSeverity.ERROR,
         },
-
-        # Model/Task errors
-        r"model|not found|doesn't exist|invalid": {
-            "title": "Model Not Found",
-            "message": "The AI model you selected isn't available.",
+        r"disk.*full|no space left|ENOSPC|DiskFull": {
+            "title": "Disk Full",
+            "message": "Your disk is full — Symphony-IR can't save files.",
             "suggestions": [
-                "If using Ollama: Pull the model (ollama pull mistral)",
-                "If using Claude: Make sure your API key is valid",
-                "Try selecting a different model in Settings",
-                "Check that the model name is spelled correctly",
+                "Free up disk space by deleting unused files",
+                "Delete old session files in .orchestrator/runs/",
+                "Move Symphony-IR to a drive with more space",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/docs/OLLAMA.md#available-models",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md",
+            "severity": ErrorSeverity.CRITICAL,
         },
 
-        # Memory/resource errors
-        r"out of memory|OutOfMemory|MemoryError": {
-            "title": "Not Enough Memory",
-            "message": "Symphony-IR or the AI model ran out of memory.",
+        # ── YAML / Configuration ──────────────────────────────────────────────
+        r"yaml.*error|YAMLError|could not.*load.*yaml|invalid yaml": {
+            "title": "Configuration File Error",
+            "message": "Symphony-IR couldn't read the agents.yaml configuration file.",
+            "suggestions": [
+                "Check .orchestrator/agents.yaml for syntax errors (incorrect indentation is common)",
+                "Validate YAML at https://yaml-online-parser.appspot.com/",
+                "Restore default config: python orchestrator.py init --project . --reset",
+                "Make sure all strings with special characters are quoted",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/CLI.md#configuration",
+            "severity": ErrorSeverity.ERROR,
+        },
+        r"agents\.yaml.*not found|No agents config": {
+            "title": "Agents Not Configured",
+            "message": "No agents.yaml configuration file found.",
+            "suggestions": [
+                "Run: python orchestrator.py init --project .",
+                "This creates a default agents.yaml with Claude configuration",
+                "Then add your API key and run again",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/CLI.md#configuration",
+            "severity": ErrorSeverity.WARNING,
+        },
+
+        # ── Context Length / Model Limits ─────────────────────────────────────
+        r"context.*length|maximum.*tokens|too long|exceeds.*limit|token.*limit": {
+            "title": "Task Too Long for Model",
+            "message": "Your task or context is longer than the AI model can handle at once.",
+            "suggestions": [
+                "Break your task into smaller pieces",
+                "Reduce the number of context files included",
+                "Use a model with a larger context window (e.g. claude-sonnet-4)",
+                "Lower the max_context_refs setting in agents.yaml",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#context",
+            "severity": ErrorSeverity.WARNING,
+        },
+
+        # ── Memory / Resources ────────────────────────────────────────────────
+        r"out of memory|OutOfMemory|MemoryError|Cannot allocate|OOM": {
+            "title": "Out of Memory",
+            "message": "Symphony-IR or the AI model ran out of RAM.",
             "suggestions": [
                 "Close other applications to free up memory",
-                "If using Ollama: Use a smaller model (mistral instead of dolphin-mixtral)",
-                "Try restarting your computer",
-                "Upgrade to more RAM for better performance",
+                "If using Ollama: Switch to a smaller model (mistral ~5GB vs dolphin-mixtral ~45GB)",
+                "Add more RAM to your system (8GB minimum, 16GB recommended)",
+                "Restart your computer to clear memory",
             ],
-            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/docs/WINDOWS-SETUP.md#system-requirements",
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/TROUBLESHOOTING.md#memory",
+            "severity": ErrorSeverity.CRITICAL,
         },
 
-        # JSON/Parsing errors
-        r"JSON|parse error|invalid.*format": {
-            "title": "Data Format Problem",
-            "message": "Symphony-IR had trouble reading or understanding data.",
+        # ── Governance / Safety ───────────────────────────────────────────────
+        r"governance.*rejected|policy.*violation|blocked by governance|BLOCKED": {
+            "title": "Task Blocked by Safety Policy",
+            "message": "Symphony-IR's governance layer blocked this task because it may be unsafe.",
             "suggestions": [
-                "Try restarting Symphony-IR",
-                "Check that your project directory isn't corrupted",
-                "Try reinitializing the project",
-                "Contact support if the problem persists",
+                "Rephrase your task to avoid keywords like 'delete all', 'drop database', or 'rm -rf'",
+                "If this is a legitimate task, review governance settings in agents.yaml",
+                "Check the governance policy in .orchestrator/logs/symphony.log for details",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/ARCHITECTURE.md#governance",
+            "severity": ErrorSeverity.WARNING,
+        },
+
+        # ── JSON / Parsing ────────────────────────────────────────────────────
+        r"JSONDecodeError|invalid.*json|json.*decode|Expecting.*value": {
+            "title": "Invalid JSON Data",
+            "message": "Symphony-IR received data it couldn't parse.",
+            "suggestions": [
+                "The AI may have returned malformed output — try the task again",
+                "If loading a session file, make sure the file isn't corrupted",
+                "Clear the .orchestrator/runs/ directory and try a fresh run",
             ],
             "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/issues",
+            "severity": ErrorSeverity.ERROR,
+        },
+
+        # ── Git ───────────────────────────────────────────────────────────────
+        r"not a git repository|git.*error|GitCommandError": {
+            "title": "Git Not Available",
+            "message": "Git context collection failed — the project may not be a Git repository.",
+            "suggestions": [
+                "This is usually harmless — Symphony-IR will skip Git context",
+                "To use Git context: run 'git init' in your project folder",
+                "To suppress: remove GitContext from context providers in agents.yaml",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/CLI.md",
+            "severity": ErrorSeverity.INFO,
+        },
+
+        # ── Process / Subprocess ──────────────────────────────────────────────
+        r"Traceback|Segmentation fault|core dumped": {
+            "title": "Unexpected Crash",
+            "message": "Symphony-IR crashed unexpectedly.",
+            "suggestions": [
+                "Check the log file at .orchestrator/logs/symphony.log for details",
+                "Try restarting Symphony-IR",
+                "Report this at https://github.com/courtneybtaylor-sys/Symphony-IR/issues",
+                "Include the log file when reporting",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/issues",
+            "severity": ErrorSeverity.CRITICAL,
+        },
+        r"KeyboardInterrupt|SIGINT|cancelled": {
+            "title": "Task Cancelled",
+            "message": "The task was cancelled by the user.",
+            "suggestions": [
+                "Run the task again to restart",
+                "Partial results may be saved in .orchestrator/runs/",
+            ],
+            "help_link": None,
+            "severity": ErrorSeverity.INFO,
+        },
+
+        # ── Catch-all model errors ────────────────────────────────────────────
+        r"model.*not found|no such model|pull model": {
+            "title": "Model Not Available",
+            "message": "The AI model you selected isn't available.",
+            "suggestions": [
+                "If using Ollama: download it with 'ollama pull mistral'",
+                "If using Claude: verify your API key is valid",
+                "Select a different model in Settings",
+                "See available models at https://ollama.ai/library",
+            ],
+            "help_link": "https://github.com/courtneybtaylor-sys/Symphony-IR/blob/main/docs/PROVIDERS.md",
+            "severity": ErrorSeverity.ERROR,
         },
     }
 
@@ -246,6 +472,7 @@ class ErrorTranslator:
                 return UserFriendlyError(
                     title=mapping["title"],
                     message=mapping["message"],
+                    severity=mapping.get("severity", ErrorSeverity.ERROR),
                     suggestions=mapping["suggestions"],
                     help_link=mapping.get("help_link"),
                     technical_details=technical_error,
@@ -318,6 +545,82 @@ class ErrorHandler:
             Formatted string for UI display
         """
         return str(user_error)
+
+
+class CLIErrorFormatter:
+    """Format UserFriendlyError objects for terminal / CLI output."""
+
+    # ANSI colour codes — disabled on Windows unless ANSICON or WT_SESSION is set
+    _USE_COLOUR = (
+        _OS != "Windows"
+        or os.environ.get("ANSICON")
+        or os.environ.get("WT_SESSION")
+        or os.environ.get("TERM_PROGRAM")
+    )
+
+    _COLOURS = {
+        "red":    "\033[91m",
+        "yellow": "\033[93m",
+        "cyan":   "\033[96m",
+        "green":  "\033[92m",
+        "dim":    "\033[2m",
+        "bold":   "\033[1m",
+        "reset":  "\033[0m",
+    }
+
+    @classmethod
+    def _c(cls, colour: str, text: str) -> str:
+        if not cls._USE_COLOUR:
+            return text
+        return f"{cls._COLOURS.get(colour, '')}{text}{cls._COLOURS['reset']}"
+
+    @classmethod
+    def format(cls, err: "UserFriendlyError", show_technical: bool = False) -> str:
+        """Return a formatted multi-line CLI error string."""
+        sev = err.severity
+        if sev == ErrorSeverity.CRITICAL:
+            colour, prefix = "red",    "🚨 CRITICAL"
+        elif sev == ErrorSeverity.ERROR:
+            colour, prefix = "red",    "❌ ERROR"
+        elif sev == ErrorSeverity.WARNING:
+            colour, prefix = "yellow", "⚠️  WARNING"
+        else:
+            colour, prefix = "cyan",   "ℹ️  INFO"
+
+        lines = [
+            "",
+            cls._c(colour, f"{prefix}: {err.title}"),
+            cls._c("bold",  err.message),
+        ]
+
+        if err.suggestions:
+            lines.append("")
+            lines.append(cls._c("green", "What you can do:"))
+            for i, s in enumerate(err.suggestions, 1):
+                lines.append(f"  {i}. {s}")
+
+        if err.help_link:
+            lines.append("")
+            lines.append(cls._c("dim", f"📚 Docs: {err.help_link}"))
+
+        if show_technical and err.technical_details:
+            lines.append("")
+            lines.append(cls._c("dim", f"Technical: {err.technical_details[:200]}"))
+
+        lines.append("")
+        return "\n".join(lines)
+
+    @classmethod
+    def print_error(cls, err: "UserFriendlyError", show_technical: bool = False) -> None:
+        """Print a formatted error to stderr."""
+        import sys
+        print(cls.format(err, show_technical=show_technical), file=sys.stderr)
+
+    @classmethod
+    def translate_and_print(cls, technical_error: str, context: str = None) -> None:
+        """Translate a raw technical error and print it to stderr."""
+        err = ErrorTranslator.translate(str(technical_error), context or "")
+        cls.print_error(err)
 
 
 # Common error helpers

@@ -21,6 +21,7 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 if str(PACKAGE_DIR) not in sys.path:
     sys.path.insert(0, str(PACKAGE_DIR))
 
+from cli_error_handler import translate_and_print, wrap_main
 from core.orchestrator import Orchestrator, AgentResponse, OrchestratorState
 from core.governance import MaaTGovernanceEngine
 from core.prompt_compiler import PromptCompiler
@@ -276,11 +277,15 @@ def cmd_run(args):
         try:
             registry.load_from_yaml(str(agents_yaml))
         except Exception as e:
-            print(f"Warning: Could not load agents config: {e}")
-            print("Falling back to mock agents.")
+            translate_and_print(str(e))
+            print("⚠️  Falling back to mock agents (no real API calls will be made).")
             use_mock = True
     else:
-        print("No agents.yaml found. Run 'orchestrator init' first, or using mock agents.")
+        print(
+            "\n⚠️  No agents.yaml found.\n"
+            "   Run first:  python orchestrator.py init --project .\n"
+            "   Using mock agents for now.\n"
+        )
         use_mock = True
 
     if use_mock:
@@ -938,6 +943,7 @@ def cmd_flow(args):
     return 0
 
 
+@wrap_main
 def main():
     parser = argparse.ArgumentParser(
         description="AI Orchestrator - Deterministic multi-agent coordination engine",
