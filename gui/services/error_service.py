@@ -83,19 +83,64 @@ def setup_file_logging(
 
 def show_error_dialog(parent, err_dict: dict) -> None:
     """
-    Show a user-friendly error dialog (thin wrapper kept here so tabs
-    don't need to import PyQt6 widgets AND error classes separately).
-    """
-    from PyQt6.QtWidgets import QMessageBox  # local import to keep service Qt-free
+    Show a user-friendly error dialog.
 
-    body = err_dict.get("message", "An error occurred.")
+    Uses QMessageBox with:
+    - Severity-appropriate icon (Critical / Warning / Information)
+    - Numbered suggestions in the body
+    - Clickable help link (opens browser)
+    - "Copy details" button for support
+    """
+    from PyQt6.QtWidgets import QMessageBox, QPushButton
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QDesktopServices
+
+    severity = err_dict.get("severity", "ERROR")
+    title    = err_dict.get("title", "Error")
+    body     = err_dict.get("message", "An error occurred.")
+
     suggestions = err_dict.get("suggestions", [])
     if suggestions:
         body += "\n\nWhat you can do:\n" + "\n".join(
             f"  {i+1}. {s}" for i, s in enumerate(suggestions)
         )
+
     link = err_dict.get("help_link", "")
     if link:
         body += f"\n\nLearn more: {link}"
 
-    QMessageBox.critical(parent, err_dict.get("title", "Error"), body)
+    # Choose icon based on severity
+    if severity in ("CRITICAL", "ERROR"):
+        icon = QMessageBox.Icon.Critical
+    elif severity == "WARNING":
+        icon = QMessageBox.Icon.Warning
+    else:
+        icon = QMessageBox.Icon.Information
+
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setText(body)
+    box.setIcon(icon)
+    box.addButton(QMessageBox.StandardButton.Ok)
+
+    # Add "Open Docs" button if there is a help link
+    docs_btn = None
+    if link:
+        docs_btn = box.addButton("Open Docs", QMessageBox.ButtonRole.HelpRole)
+
+    # Add "Copy Error" button so users can paste it into a bug report
+    copy_btn = box.addButton("Copy Error", QMessageBox.ButtonRole.ActionRole)
+
+    box.exec()
+
+    clicked = box.clickedButton()
+    if docs_btn and clicked == docs_btn:
+        QDesktopServices.openUrl(QUrl(link))
+    elif clicked == copy_btn:
+        from PyQt6.QtWidgets import QApplication
+        clipboard_text = f"{title}\n\n{err_dict.get('message', '')}"
+        if suggestions:
+            clipboard_text += "\n\nSuggestions:\n" + "\n".join(
+                f"  {i+1}. {s}" for i, s in enumerate(suggestions)
+            )
+        QApplication.clipboard().setText(clipboard_text)

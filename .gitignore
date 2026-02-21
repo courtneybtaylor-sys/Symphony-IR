@@ -22,13 +22,10 @@ ENV/
 # Secrets / credentials (never commit these)
 .env
 *.env
-.orchestrator/.env
-.orchestrator/config.json
 
-# Orchestrator runtime state (local only)
-.orchestrator/runs/
-.orchestrator/logs/
-.orchestrator/flows/
+# Orchestrator runtime directories (generated at runtime, never commit)
+# Matches .orchestrator/ at any depth (project root, ai-orchestrator/, etc.)
+**/.orchestrator/
 
 # IDE / editor
 .vscode/
