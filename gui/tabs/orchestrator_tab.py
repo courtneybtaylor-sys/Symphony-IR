@@ -4,11 +4,7 @@ Orchestrator Tab — Tab 1.
 Lets the user describe a task and run the Symphony-IR multi-agent
 orchestrator.  Output is streamed in real time and auto-redacted.
 
-UX improvements over the original monolith
--------------------------------------------
-* Cancel button terminates the running subprocess immediately.
-* Run button disabled while a job is active (prevents double-submit).
-* Progress spinner hidden when idle.
+Uses custom widgets with "Deterministic Elegance" design system.
 """
 
 from __future__ import annotations
@@ -17,32 +13,21 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtCore import Qt, QSettings
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (
-    QCheckBox, QGroupBox, QFormLayout, QHBoxLayout, QMessageBox,
-    QProgressBar, QPushButton, QTextEdit, QVBoxLayout, QWidget,
-)
+from PyQt6.QtWidgets import QMessageBox, QVBoxLayout, QHBoxLayout, QWidget
 
+from widgets import (
+    SplitViewPanel,
+    GradientCard,
+    StyledTextEdit,
+    StyledCheckBox,
+    PrimaryButton,
+    DangerButton,
+    SyntaxHighlightedLog,
+    ProgressCard,
+)
 from services.orchestrator_service import OrchestratorWorker
 from services.credential_service import CredentialService
 from services.error_service import show_error_dialog, get_api_key_error
-
-
-def _output_box() -> QTextEdit:
-    tb = QTextEdit()
-    tb.setReadOnly(True)
-    tb.setFont(QFont("Consolas", 9))
-    return tb
-
-
-def _btn(label: str, color: str = "#4CAF50") -> QPushButton:
-    b = QPushButton(label)
-    b.setStyleSheet(
-        f"QPushButton{{background:{color};color:white;font-weight:bold;padding:9px 18px;}}"
-        f"QPushButton:hover{{background:{color}cc;}}"
-        f"QPushButton:disabled{{background:#aaa;}}"
-    )
-    return b
 
 
 class OrchestratorTab(QWidget):
@@ -57,11 +42,20 @@ class OrchestratorTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setSpacing(12)
 
-        grp = QGroupBox("Task Description")
-        form = QFormLayout(grp)
-        self.task_input = QTextEdit()
+        # Create split view (45% left for input, 55% right for output)
+        self.split_view = SplitViewPanel(
+            left_title="Task Input",
+            right_title="Execution Output"
+        )
+
+        # ---- LEFT PANEL: Task Input with Gradient Card ----
+        input_card = GradientCard("Task Definition")
+
+        self.task_input = StyledTextEdit()
         self.task_input.setPlaceholderText(
             "Describe what you want the AI agents to do…\n\n"
             "Examples:\n"
@@ -69,35 +63,54 @@ class OrchestratorTab(QWidget):
             "  • Design a REST API for a todo application\n"
             "  • Refactor the payment service for better testability"
         )
-        self.task_input.setMinimumHeight(130)
-        form.addRow("Task:", self.task_input)
-        self.dry_run = QCheckBox("Dry run  (show plan only, no execution)")
-        self.verbose = QCheckBox("Verbose output")
-        form.addRow(self.dry_run)
-        form.addRow(self.verbose)
-        layout.addWidget(grp)
+        self.task_input.setMinimumHeight(120)
+        input_card.add_widget(self.task_input)
 
-        btn_row = QHBoxLayout()
-        self.run_btn    = _btn("▶  Run Orchestrator", "#4CAF50")
-        self.cancel_btn = _btn("⏹  Cancel",           "#F44336")
+        # Checkboxes for options
+        checkbox_container = QWidget()
+        checkbox_layout = QVBoxLayout()
+        checkbox_layout.setContentsMargins(0, 8, 0, 0)
+        checkbox_layout.setSpacing(6)
+
+        self.dry_run = StyledCheckBox("Dry run mode  (show plan only, no execution)")
+        self.verbose = StyledCheckBox("Verbose output")
+        checkbox_layout.addWidget(self.dry_run)
+        checkbox_layout.addWidget(self.verbose)
+
+        checkbox_container.setLayout(checkbox_layout)
+        input_card.add_widget(checkbox_container)
+
+        # Action buttons
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 12, 0, 0)
+        button_layout.setSpacing(8)
+
+        self.run_btn = PrimaryButton("▶ Run Orchestrator")
+        self.cancel_btn = DangerButton("⏹ Cancel")
         self.cancel_btn.setEnabled(False)
         self.run_btn.clicked.connect(self._run)
         self.cancel_btn.clicked.connect(self._cancel)
-        btn_row.addWidget(self.run_btn)
-        btn_row.addWidget(self.cancel_btn)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
 
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 0)          # indeterminate
-        self.progress.setVisible(False)
-        layout.addWidget(self.progress)
+        button_layout.addWidget(self.run_btn)
+        button_layout.addWidget(self.cancel_btn)
+        button_layout.addStretch()
 
-        out_grp = QGroupBox("Output  (auto-redacted)")
-        out_layout = QVBoxLayout(out_grp)
-        self.output = _output_box()
-        out_layout.addWidget(self.output)
-        layout.addWidget(out_grp)
+        button_container = QWidget()
+        button_container.setLayout(button_layout)
+        input_card.add_widget(button_container)
+
+        self.split_view.add_left_widget(input_card)
+
+        # ---- RIGHT PANEL: Output with Syntax Highlighting ----
+        self.output = SyntaxHighlightedLog()
+        self.split_view.add_right_widget(self.output)
+
+        main_layout.addWidget(self.split_view)
+
+        # Progress indicator below split view
+        self.progress_card = ProgressCard("Execution Status")
+        self.progress_card.set_progress(0, "idle")
+        main_layout.addWidget(self.progress_card)
 
     # ---------------------------------------------------------------- slots
 
@@ -113,10 +126,11 @@ class OrchestratorTab(QWidget):
             show_error_dialog(self, get_api_key_error().to_dict())
             return
 
-        self.output.clear()
+        self.output.clear_logs()
+        self.output.append_log("Initializing orchestrator...", "info")
         self._set_busy(True)
         self._worker = OrchestratorWorker("run", self._project_root, task=task)
-        self._worker.progress.connect(self.output.append)
+        self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_done)
         self._worker.error.connect(self._on_error)
         self._worker.start()
@@ -125,19 +139,44 @@ class OrchestratorTab(QWidget):
         if self._worker:
             self._worker.cancel()
         self._set_busy(False)
-        self.output.append("\n⏹  Cancelled.")
+        self.output.append_log("Cancelled by user.", "warning")
+        self.progress_card.set_progress(0, "idle")
+
+    def _on_progress(self, text: str):
+        """Handle progress updates from worker."""
+        # Determine log level based on content
+        if "error" in text.lower() or "failed" in text.lower():
+            level = "error"
+        elif "success" in text.lower() or "complete" in text.lower():
+            level = "success"
+        elif "warning" in text.lower():
+            level = "warning"
+        else:
+            level = "info"
+
+        self.output.append_log(text, level)
+        self.progress_card.set_progress(50, "running")  # Mid-progress indicator
 
     def _on_done(self, result: dict):
         self._set_busy(False)
-        self.output.append("\n" + "─" * 60 + "\n✅  Complete\n" + "─" * 60)
+        self.output.append_log("✅ Execution complete", "success")
+        self.progress_card.set_progress(100, "success")
 
     def _on_error(self, err: dict):
         self._set_busy(False)
+        self.output.append_log("❌ Error during execution", "error")
+        self.progress_card.set_progress(0, "error")
         show_error_dialog(self, err)
 
     # --------------------------------------------------------------- helpers
 
     def _set_busy(self, active: bool):
+        """Update UI state when task is running/idle."""
         self.run_btn.setEnabled(not active)
         self.cancel_btn.setEnabled(active)
-        self.progress.setVisible(active)
+        self.task_input.setReadOnly(active)
+
+        if active:
+            self.progress_card.set_progress(0, "running")
+        else:
+            self.progress_card.set_progress(0, "idle")

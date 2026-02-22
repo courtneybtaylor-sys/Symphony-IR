@@ -1,0 +1,213 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "last_updated": "2026-02-22",
+    "format": "design_tokens_spec_v1"
+  },
+  "color": {
+    "primary": {
+      "base": {
+        "value": "#1f77b4",
+        "description": "Primary action color (deep blue)"
+      },
+      "dark": {
+        "value": "#1557a0",
+        "description": "Darker shade for hover/pressed states"
+      },
+      "light": {
+        "value": "#4ca3ff",
+        "description": "Lighter shade for backgrounds"
+      },
+      "hover": {
+        "value": "#2d7fcc",
+        "description": "Hover state color"
+      }
+    },
+    "accent": {
+      "value": "#ff7f0e",
+      "description": "Accent highlights and secondary actions (orange)"
+    },
+    "status": {
+      "success": {
+        "value": "#2ca02c",
+        "description": "Success state indicator (green)"
+      },
+      "error": {
+        "value": "#d62728",
+        "description": "Error state indicator (red)"
+      },
+      "warning": {
+        "value": "#ff9800",
+        "description": "Warning state indicator (amber)"
+      },
+      "info": {
+        "value": "#17a2b8",
+        "description": "Info state indicator (cyan)"
+      }
+    },
+    "neutral": {
+      "background": {
+        "value": "#ffffff",
+        "light": "#ffffff",
+        "dark": "#0d1117",
+        "description": "Page background color"
+      },
+      "surface": {
+        "value": "#f8f9fa",
+        "light": "#f8f9fa",
+        "dark": "#161b22",
+        "description": "Surface/card background color"
+      },
+      "border": {
+        "value": "#e0e0e0",
+        "light": "#e0e0e0",
+        "dark": "#30363d",
+        "description": "Border and divider color"
+      },
+      "text_primary": {
+        "value": "#1a1a1a",
+        "light": "#1a1a1a",
+        "dark": "#e6edf3",
+        "description": "Primary text color"
+      },
+      "text_secondary": {
+        "value": "#666666",
+        "light": "#666666",
+        "dark": "#8b949e",
+        "description": "Secondary text color (disabled, hints)"
+      }
+    }
+  },
+  "typography": {
+    "font_family": {
+      "base": {
+        "value": "Segoe UI, Roboto, sans-serif",
+        "description": "Default sans-serif font stack"
+      },
+      "mono": {
+        "value": "Courier New, monospace",
+        "description": "Monospace font for code"
+      }
+    },
+    "font_size": {
+      "xs": {
+        "value": "12px",
+        "description": "Extra small text (captions, hints)"
+      },
+      "sm": {
+        "value": "14px",
+        "description": "Small text"
+      },
+      "base": {
+        "value": "16px",
+        "description": "Base/body text size"
+      },
+      "lg": {
+        "value": "18px",
+        "description": "Large text"
+      },
+      "xl": {
+        "value": "24px",
+        "description": "Extra large text (headings)"
+      },
+      "xxl": {
+        "value": "32px",
+        "description": "2x large text (page titles)"
+      }
+    },
+    "line_height": {
+      "tight": {
+        "value": "1.2",
+        "description": "Tight line height for headings"
+      },
+      "normal": {
+        "value": "1.5",
+        "description": "Normal line height for body text"
+      },
+      "relaxed": {
+        "value": "1.8",
+        "description": "Relaxed line height for readability"
+      }
+    }
+  },
+  "spacing": {
+    "xs": {
+      "value": "4px",
+      "description": "Extra small spacing (4px)"
+    },
+    "sm": {
+      "value": "8px",
+      "description": "Small spacing (8px)"
+    },
+    "md": {
+      "value": "16px",
+      "description": "Medium spacing (16px)"
+    },
+    "lg": {
+      "value": "24px",
+      "description": "Large spacing (24px)"
+    },
+    "xl": {
+      "value": "32px",
+      "description": "Extra large spacing (32px)"
+    },
+    "xxl": {
+      "value": "48px",
+      "description": "2x large spacing (48px)"
+    }
+  },
+  "border_radius": {
+    "sm": {
+      "value": "4px",
+      "description": "Small border radius"
+    },
+    "md": {
+      "value": "8px",
+      "description": "Medium border radius"
+    },
+    "lg": {
+      "value": "12px",
+      "description": "Large border radius"
+    },
+    "full": {
+      "value": "9999px",
+      "description": "Full/pill border radius"
+    }
+  },
+  "shadow": {
+    "sm": {
+      "value": "0 1px 2px rgba(0, 0, 0, 0.05)",
+      "description": "Small shadow (subtle)"
+    },
+    "md": {
+      "value": "0 4px 6px rgba(0, 0, 0, 0.1)",
+      "description": "Medium shadow"
+    },
+    "lg": {
+      "value": "0 10px 15px rgba(0, 0, 0, 0.15)",
+      "description": "Large shadow"
+    },
+    "xl": {
+      "value": "0 20px 25px rgba(0, 0, 0, 0.2)",
+      "description": "Extra large shadow (prominent)"
+    }
+  },
+  "animation": {
+    "duration_fast": {
+      "value": "150ms",
+      "description": "Fast transition duration"
+    },
+    "duration_normal": {
+      "value": "250ms",
+      "description": "Normal transition duration"
+    },
+    "duration_slow": {
+      "value": "400ms",
+      "description": "Slow transition duration"
+    },
+    "easing_ease_in_out": {
+      "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "description": "Ease in-out timing function"
+    }
+  }
+}
