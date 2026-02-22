@@ -37,10 +37,11 @@ _GUI_DIR = Path(__file__).parent
 if str(_GUI_DIR) not in sys.path:
     sys.path.insert(0, str(_GUI_DIR))
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QTabWidget
-from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox, QAction
+from PyQt6.QtCore import QTimer
 
 from version import VERSION, APP_NAME, ORG_NAME
+from widgets import TabPanel, set_dark_mode, get_theme
 from services.credential_service import CredentialService
 from services.error_service import setup_file_logging
 from tabs.orchestrator_tab import OrchestratorTab
@@ -53,81 +54,36 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path.home() / "Symphony-IR"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Application stylesheet
-# ─────────────────────────────────────────────────────────────────────────────
-
-_STYLESHEET = """
-QMainWindow, QDialog { background: #F5F5F5; }
-
-QTabBar::tab {
-    background: #E0E0E0; padding: 8px 22px;
-    margin-right: 2px; border-radius: 4px 4px 0 0;
-}
-QTabBar::tab:selected { background: #1565C0; color: white; }
-QTabBar::tab:hover:!selected { background: #BBDEFB; }
-
-QGroupBox {
-    border: 1px solid #CFD8DC; border-radius: 6px;
-    margin-top: 12px; padding-top: 10px; background: white;
-}
-QGroupBox::title {
-    subcontrol-origin: margin; left: 10px; padding: 0 4px;
-    color: #1565C0; font-weight: bold;
-}
-
-QPushButton {
-    background: #1976D2; color: white; border: none;
-    border-radius: 4px; padding: 8px 16px; font-weight: bold;
-}
-QPushButton:hover   { background: #1565C0; }
-QPushButton:pressed { background: #0D47A1; }
-QPushButton:disabled { background: #B0BEC5; color: #ECEFF1; }
-
-QLineEdit, QTextEdit, QComboBox, QSpinBox {
-    border: 1px solid #B0BEC5; border-radius: 4px;
-    padding: 5px 7px; background: white;
-}
-QLineEdit:focus, QTextEdit:focus, QComboBox:focus { border-color: #1976D2; }
-
-QTableWidget {
-    gridline-color: #ECEFF1; background: white;
-    alternate-background-color: #F5F5F5;
-}
-QHeaderView::section {
-    background: #1565C0; color: white;
-    padding: 6px; border: none; font-weight: bold;
-}
-
-QProgressBar { border: 1px solid #B0BEC5; border-radius: 4px; text-align: center; }
-QProgressBar::chunk { background: #1976D2; border-radius: 4px; }
-
-QStatusBar { background: #ECEFF1; border-top: 1px solid #CFD8DC; color: #546E7A; }
-"""
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main window
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SymphonyIRApp(QMainWindow):
-    """Top-level application window."""
+    """Top-level application window with theme support and modern UI."""
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"Symphony-IR  {VERSION}  —  AI Orchestrator")
-        self.setGeometry(100, 100, 1260, 820)
-        self.setMinimumSize(900, 600)
+        self.setWindowTitle(f"🎼 Symphony-IR  {VERSION}")
+        self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1000, 700)
 
-        tabs = QTabWidget()
-        tabs.addTab(OrchestratorTab(PROJECT_ROOT), "🎼  Orchestrator")
-        tabs.addTab(FlowTab(PROJECT_ROOT),          "🗺️  Symphony Flow")
-        tabs.addTab(HistoryTab(PROJECT_ROOT),       "📋  History")
-        tabs.addTab(SettingsTab(PROJECT_ROOT),       "⚙️  Settings")
-        self.setCentralWidget(tabs)
+        # Get theme manager for later use
+        self.theme = get_theme()
+
+        # Create custom tab widget with enhanced styling
+        self.tabs = TabPanel()
+
+        # Add tabs with emoji icons
+        self.tabs.addTab(OrchestratorTab(PROJECT_ROOT), "🎼  Orchestrator")
+        self.tabs.addTab(FlowTab(PROJECT_ROOT),          "🗺️  Symphony Flow")
+        self.tabs.addTab(HistoryTab(PROJECT_ROOT),       "📋  History")
+        self.tabs.addTab(SettingsTab(PROJECT_ROOT),       "⚙️  Settings")
+
+        self.setCentralWidget(self.tabs)
 
         self._build_menus()
-        self.setStyleSheet(_STYLESHEET)
+        self._apply_theme()
 
         keyring_status = (
             "🔐 keyring available — keys encrypted"
@@ -138,14 +94,114 @@ class SymphonyIRApp(QMainWindow):
             f"Symphony-IR {VERSION}  ·  {keyring_status}"
         )
 
+    def _apply_theme(self):
+        """Apply current theme to application."""
+        palette = self.theme.palette
+        stylesheet = f"""
+            QMainWindow, QDialog {{
+                background-color: {palette.background};
+                color: {palette.text_primary};
+            }}
+
+            QTabWidget::pane {{
+                border: 1px solid {palette.border};
+                border-radius: 6px;
+            }}
+
+            QTabBar::tab {{
+                background-color: {palette.surface};
+                color: {palette.text_primary};
+                border: 1px solid {palette.border};
+                border-bottom: none;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                padding: 8px 20px;
+                font-weight: bold;
+                margin-right: 2px;
+            }}
+
+            QTabBar::tab:selected {{
+                background-color: {palette.primary};
+                color: white;
+                border-color: {palette.primary};
+            }}
+
+            QTabBar::tab:hover:!selected {{
+                background-color: {palette.primary};
+                opacity: 0.7;
+            }}
+
+            QGroupBox {{
+                border: 1px solid {palette.border};
+                border-radius: 6px;
+                margin-top: 12px;
+                padding-top: 10px;
+                background-color: {palette.surface};
+                color: {palette.text_primary};
+            }}
+
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 4px;
+                color: {palette.primary};
+                font-weight: bold;
+            }}
+
+            QTableWidget {{
+                gridline-color: {palette.border};
+                background-color: {palette.background};
+                alternate-background-color: {palette.surface};
+                color: {palette.text_primary};
+            }}
+
+            QHeaderView::section {{
+                background-color: {palette.primary};
+                color: white;
+                padding: 6px;
+                border: none;
+                font-weight: bold;
+            }}
+
+            QStatusBar {{
+                background-color: {palette.surface};
+                border-top: 1px solid {palette.border};
+                color: {palette.text_primary};
+            }}
+
+            QMessageBox {{
+                background-color: {palette.background};
+                color: {palette.text_primary};
+            }}
+
+            QMessageBox QLabel {{
+                color: {palette.text_primary};
+            }}
+
+            QMessageBox QPushButton {{
+                min-width: 60px;
+            }}
+        """
+        self.setStyleSheet(stylesheet)
+
     def _build_menus(self):
+        """Build application menu bar."""
         mb = self.menuBar()
 
+        # File menu
         fm = mb.addMenu("File")
         qa = QAction("Quit", self)
         qa.triggered.connect(self.close)
         fm.addAction(qa)
 
+        # View menu - for theme control
+        vm = mb.addMenu("View")
+        dark_mode_action = QAction("Dark Mode", self, checkable=True)
+        dark_mode_action.setChecked(self.theme.dark_mode)
+        dark_mode_action.triggered.connect(self._toggle_dark_mode)
+        vm.addAction(dark_mode_action)
+
+        # Help menu
         hm = mb.addMenu("Help")
         _gh = "https://github.com/courtneybtaylor-sys/Symphony-IR"
         for label, url in [
@@ -163,11 +219,22 @@ class SymphonyIRApp(QMainWindow):
         about_a.triggered.connect(self._about)
         hm.addAction(about_a)
 
+    def _toggle_dark_mode(self, checked: bool):
+        """Toggle dark mode."""
+        set_dark_mode(checked)
+        self._apply_theme()
+
     def _about(self):
+        """Show about dialog."""
         QMessageBox.about(
             self, f"About Symphony-IR {VERSION}",
             f"Symphony-IR  {VERSION}\n"
             "Deterministic multi-agent AI orchestration\n\n"
+            "Design: Deterministic Elegance™\n"
+            "  • Gradient borders (Cyan → Purple)\n"
+            "  • Glassmorphism effects\n"
+            "  • Smooth animations\n"
+            "  • Light/Dark theme support\n\n"
             "Security:\n"
             "  🔐  API keys → system Credential Manager\n"
             "  📋  Sessions → auto-redacted before display\n"
