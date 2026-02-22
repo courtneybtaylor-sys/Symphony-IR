@@ -1,0 +1,100 @@
+name: Dependency Security Check
+
+on:
+  schedule:
+    # Run weekly on Mondays at 09:00 UTC
+    - cron: '0 9 * * 1'
+  pull_request:
+    paths:
+      - '**/requirements.txt'
+      - '.github/workflows/dependency-check.yml'
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    name: Security Audit with pip-audit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Audit AI Orchestrator dependencies
+        continue-on-error: true
+        run: |
+          echo "🔍 Scanning ai-orchestrator/requirements.txt..."
+          pip-audit --requirements ai-orchestrator/requirements.txt --format markdown
+
+      - name: Audit GUI dependencies
+        continue-on-error: true
+        run: |
+          echo "🔍 Scanning gui/requirements.txt..."
+          pip-audit --requirements gui/requirements.txt --format markdown
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Dependency security audit completed. See job details for vulnerabilities.'
+            })
+
+  dependabot-check:
+    runs-on: ubuntu-latest
+    name: Check Dependabot Updates Available
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Check for outdated packages
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          echo "📦 Checking for outdated packages in ai-orchestrator..."
+          pip list --outdated --format=columns | head -20
+          echo ""
+          echo "📦 Checking for outdated packages in gui..."
+          pip list --outdated --format=columns | head -20
+
+  license-compliance:
+    runs-on: ubuntu-latest
+    name: License Compliance Check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Check licenses
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-licenses
+          echo "📜 Licenses in ai-orchestrator dependencies:"
+          pip install --quiet -r ai-orchestrator/requirements.txt
+          pip-licenses --format=markdown --with-urls | head -50

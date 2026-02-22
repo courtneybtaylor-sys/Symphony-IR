@@ -1,0 +1,13 @@
+# Never commit certificate files to git — use CI/CD secrets instead.
+*.pfx
+*.p12
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
+*.p7b
+*.p7c
+*.spc

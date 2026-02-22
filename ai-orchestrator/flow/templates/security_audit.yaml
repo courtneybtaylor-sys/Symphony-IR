@@ -1,137 +1,228 @@
 template_id: "security_audit"
-name: "Security Audit & Threat Assessment"
-description: "Guided security review with OWASP Top 10, vulnerability analysis, and compliance assessment"
-domain: "Security"
-target_audience: "Security Engineers, DevSecOps, Compliance Officers"
+name: "Security Audit"
+description: "Comprehensive security review workflow: vulnerability assessment, threat modeling, and remediation planning"
+domain: "security"
+industry: "cross-industry"
+difficulty_level: "advanced"
+estimated_duration: "2-4 hours"
+tags: ["security", "vulnerability", "compliance", "pentest", "devsecops"]
+required_context: ["target_system", "scope"]
 
 nodes:
   start:
-    summary: "Security Audit Kickoff"
-    role: "security_analyst"
-    intent: "Perform comprehensive security audit of {target}"
-    phase: "ASSESSMENT"
+    summary: "Beginning security audit of {target_system}"
+    role: "reviewer"
+    intent: "Perform comprehensive security audit on {target_system} within scope: {scope}"
+    phase: "PLANNING"
     priority: 9
     context_refs:
-      - "file:{target}"
-    constraints: []
-    token_budget_hint: 1200
+      - "file:{target_system}"
+    constraints:
+      - "Define audit scope and objectives clearly"
+      - "Identify critical assets and attack surfaces"
+    token_budget_hint: 1000
     options:
       - id: "A"
-        label: "OWASP Top 10 focus"
-        description: "Review against OWASP Top 10 2023 vulnerabilities"
-        next_node_id: "owasp_review"
+        label: "Vulnerability Assessment"
+        description: "Scan for known CVEs, misconfigurations, and weaknesses"
+        next_node_id: "vulnerability_scan"
       - id: "B"
-        label: "Infrastructure security"
-        description: "Audit cloud/network/database security"
-        next_node_id: "infra_security"
+        label: "Threat Modeling"
+        description: "STRIDE/DREAD analysis of system architecture"
+        next_node_id: "threat_model"
       - id: "C"
-        label: "API security"
-        description: "Analyze REST/GraphQL API security"
-        next_node_id: "api_security"
+        label: "Code Security Review"
+        description: "Static analysis for injection, auth, and crypto issues"
+        next_node_id: "code_review"
       - id: "D"
-        label: "Data protection & compliance"
-        description: "Review data handling, privacy, regulatory compliance"
+        label: "Compliance Check"
+        description: "Verify against OWASP Top 10, SOC2, or PCI-DSS"
         next_node_id: "compliance_check"
 
-  owasp_review:
-    summary: "OWASP Top 10 Vulnerability Review"
-    role: "security_analyst"
-    intent: "Review {target} against OWASP Top 10 2023 vulnerabilities"
-    phase: "ASSESSMENT"
-    priority: 9
+  vulnerability_scan:
+    summary: "Identifying vulnerabilities in {target_system}"
+    role: "reviewer"
+    intent: "Identify and classify vulnerabilities in {target_system} by severity (CVSS)"
+    phase: "REVIEW"
+    priority: 10
     context_refs:
-      - "file:{target}"
+      - "file:{target_system}"
     constraints:
-      - "Cover: Injection, Broken Authentication, Broken Access Control, XSS, CSRF, etc."
-      - "Assess impact and likelihood for each finding"
-      - "Provide specific remediation steps"
+      - "Classify findings by CVSS score: Critical (9-10), High (7-8.9), Medium (4-6.9), Low (0-3.9)"
+      - "Include CVE references where applicable"
+      - "Provide proof-of-concept or reproduction steps"
     token_budget_hint: 1500
     options:
       - id: "A"
-        label: "Identify vulnerabilities"
-        description: "Find specific OWASP issues"
-        next_node_id: "vuln_analysis"
+        label: "Generate Remediation Plan"
+        description: "Create prioritized fix list for all findings"
+        next_node_id: "remediation_plan"
       - id: "B"
-        label: "Risk assessment"
-        description: "Create risk matrix and prioritization"
-        next_node_id: "risk_matrix"
+        label: "Escalate Critical Findings"
+        description: "Immediate action plan for critical/high severity issues"
+        next_node_id: "critical_response"
 
-  infra_security:
-    summary: "Infrastructure Security Assessment"
-    role: "security_analyst"
-    intent: "Audit infrastructure security of {target}"
-    phase: "ASSESSMENT"
-    priority: 8
+  threat_model:
+    summary: "Threat modeling {target_system} using STRIDE"
+    role: "architect"
+    intent: "Apply STRIDE threat modeling to {target_system} to identify attack vectors"
+    phase: "RESEARCH"
+    priority: 9
     context_refs:
-      - "file:{target}"
+      - "file:{target_system}"
     constraints:
-      - "Review cloud service configuration (AWS/Azure/GCP)"
-      - "Check network segmentation, firewalls, WAF"
-      - "Validate database hardening and access controls"
-      - "Assess secrets management and encryption"
-    token_budget_hint: 1400
-    options: []
+      - "Cover: Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation of Privilege"
+      - "Rate each threat by likelihood and impact"
+      - "Map threats to mitigations and security controls"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Design Security Controls"
+        description: "Architect countermeasures for identified threats"
+        next_node_id: "security_controls"
+      - id: "B"
+        label: "Generate Risk Register"
+        description: "Create formal risk register with acceptance criteria"
+        next_node_id: "risk_register"
 
-  api_security:
-    summary: "API Security Review"
-    role: "security_analyst"
-    intent: "Perform security audit of REST/GraphQL API {target}"
-    phase: "ASSESSMENT"
-    priority: 8
+  code_review:
+    summary: "Static security analysis of {target_system} codebase"
+    role: "reviewer"
+    intent: "Perform security-focused code review on {target_system} for OWASP Top 10 vulnerabilities"
+    phase: "REVIEW"
+    priority: 9
     context_refs:
-      - "file:{target}"
+      - "file:{target_system}"
     constraints:
-      - "Review authentication (JWT, OAuth2, API keys)"
-      - "Check authorization and permission enforcement"
-      - "Validate input validation and rate limiting"
-      - "Assess error handling and information disclosure"
-    token_budget_hint: 1300
-    options: []
+      - "Check: Injection, Auth failures, Sensitive data exposure, XXE, Broken access control"
+      - "Check: Security misconfiguration, XSS, Insecure deserialization, Vulnerable components"
+      - "Provide line-by-line findings with severity and suggested fixes"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Create Security Test Suite"
+        description: "Write security-specific unit and integration tests"
+        next_node_id: "security_tests"
+      - id: "B"
+        label: "Generate Patch Recommendations"
+        description: "Provide specific code patches for each finding"
+        next_node_id: "remediation_plan"
 
   compliance_check:
-    summary: "Data Protection & Compliance Review"
-    role: "security_analyst"
-    intent: "Review {target} for compliance with GDPR, CCPA, PCI-DSS, HIPAA"
-    phase: "ASSESSMENT"
-    priority: 7
+    summary: "Compliance verification of {target_system}"
+    role: "reviewer"
+    intent: "Verify {target_system} compliance against {scope} requirements"
+    phase: "REVIEW"
+    priority: 8
     context_refs:
-      - "file:{target}"
+      - "file:{target_system}"
     constraints:
-      - "Check data handling and privacy controls"
-      - "Validate encryption at rest and in transit"
-      - "Review audit logging and monitoring"
-      - "Assess incident response and breach notification procedures"
+      - "Map controls to compliance framework requirements"
+      - "Identify gaps and non-compliant areas"
+      - "Provide evidence requirements for audit"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Create Compliance Roadmap"
+        description: "Prioritized plan to achieve full compliance"
+        next_node_id: "compliance_roadmap"
+      - id: "B"
+        label: "Generate Audit Report"
+        description: "Formal compliance audit report with findings"
+        next_node_id: "audit_report"
+
+  remediation_plan:
+    summary: "Creating remediation plan for security findings"
+    role: "implementer"
+    intent: "Generate prioritized remediation plan for all security findings in {target_system}"
+    phase: "SYNTHESIS"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Order by risk priority (Critical first)"
+      - "Include estimated effort for each fix"
+      - "Provide immediate workarounds for critical issues"
+      - "Define acceptance criteria for each remediation"
+    token_budget_hint: 1500
+    options: []
+
+  critical_response:
+    summary: "Immediate response plan for critical findings"
+    role: "architect"
+    intent: "Create emergency response plan for critical security vulnerabilities in {target_system}"
+    phase: "SYNTHESIS"
+    priority: 10
+    context_refs: []
+    constraints:
+      - "Define immediate containment steps"
+      - "Identify rollback or hotfix options"
+      - "Escalation path and communication plan"
     token_budget_hint: 1200
     options: []
 
-  vuln_analysis:
-    summary: "Detailed Vulnerability Analysis"
-    role: "security_analyst"
-    intent: "Analyze specific vulnerabilities in {target}"
-    phase: "ANALYSIS"
-    priority: 10
-    context_refs:
-      - "file:{target}"
+  security_controls:
+    summary: "Designing security controls for {target_system}"
+    role: "architect"
+    intent: "Design and document security controls that mitigate identified threats in {target_system}"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs: []
     constraints:
-      - "Provide proof-of-concept for critical vulnerabilities"
-      - "Include affected code snippets"
-      - "List recommended fixes with implementation complexity"
-      - "Reference CVEs and security bulletins if applicable"
-    token_budget_hint: 1600
+      - "Cover: preventive, detective, corrective controls"
+      - "Map each control to mitigated threat(s)"
+      - "Include implementation guidance"
+    token_budget_hint: 1500
     options: []
 
-  risk_matrix:
-    summary: "Risk Prioritization Matrix"
-    role: "security_analyst"
-    intent: "Create risk matrix for {target} vulnerabilities"
-    phase: "ANALYSIS"
+  risk_register:
+    summary: "Generating formal risk register for {target_system}"
+    role: "architect"
+    intent: "Create a formal risk register with risk IDs, owners, and acceptance criteria"
+    phase: "SYNTHESIS"
     priority: 7
-    context_refs:
-      - "file:{target}"
+    context_refs: []
     constraints:
-      - "Use CVSS score if available"
-      - "Rate impact (1-5) and likelihood (1-5)"
-      - "Prioritize by risk_score = impact × likelihood"
-      - "Include remediation timeline recommendations"
-    token_budget_hint: 1000
+      - "Format: Risk ID, Description, Likelihood, Impact, Risk Score, Owner, Status"
+      - "Include risk appetite statements"
+    token_budget_hint: 1200
+    options: []
+
+  security_tests:
+    summary: "Creating security test suite for {target_system}"
+    role: "implementer"
+    intent: "Write security-specific tests covering all identified vulnerabilities in {target_system}"
+    phase: "IMPLEMENTATION"
+    priority: 8
+    context_refs:
+      - "file:{target_system}"
+    constraints:
+      - "Cover: authentication bypass, injection, privilege escalation"
+      - "Include negative test cases for each finding"
+    token_budget_hint: 2000
+    options: []
+
+  compliance_roadmap:
+    summary: "Creating compliance roadmap for {target_system}"
+    role: "architect"
+    intent: "Build a phased compliance roadmap to achieve full {scope} compliance"
+    phase: "SYNTHESIS"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Phase by effort: Quick wins, Medium-term, Long-term"
+      - "Include resource estimates and milestone dates"
+    token_budget_hint: 1200
+    options: []
+
+  audit_report:
+    summary: "Generating formal compliance audit report"
+    role: "integrator"
+    intent: "Produce a formal audit report documenting compliance status of {target_system}"
+    phase: "SYNTHESIS"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Executive summary, detailed findings, recommendations"
+      - "Include control matrix with pass/fail/partial status"
+    token_budget_hint: 2000
     options: []

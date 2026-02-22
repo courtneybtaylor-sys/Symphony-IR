@@ -9,9 +9,7 @@
 **Choose your path:**
 
 ### 👤 I want to use Symphony-IR now
-- **Windows:** [5-minute Windows setup](GETTING_STARTED_WINDOWS.md)
-- **macOS:** [5-minute macOS setup](GETTING_STARTED_MACOS.md)
-- **Linux:** [5-minute Linux setup](GETTING_STARTED_LINUX.md)
+- [Getting Started Guide](GETTING_STARTED.md) (Windows, macOS, Linux)
 
 ### 📚 I want to learn about it first
 - [Architecture & Features](docs/ARCHITECTURE.md)
@@ -91,20 +89,24 @@ cd gui && streamlit run app.py
 
 ---
 
-## 📖 Learn More
+## 📖 Documentation
+
+All documentation is organized in the [`docs/`](docs/) directory. Here's where to find what you need:
 
 | Want to... | Read... |
 |------------|---------|
-| Set up on Windows | [GETTING_STARTED_WINDOWS.md](GETTING_STARTED_WINDOWS.md) |
-| Set up on macOS | [GETTING_STARTED_MACOS.md](GETTING_STARTED_MACOS.md) |
-| Set up on Linux | [GETTING_STARTED_LINUX.md](GETTING_STARTED_LINUX.md) |
-| Understand how it works | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Use guided workflows | [docs/FLOW.md](docs/FLOW.md) |
-| Compare Claude vs Ollama | [docs/PROVIDERS.md](docs/PROVIDERS.md) |
-| Use the CLI | [docs/CLI.md](docs/CLI.md) |
-| Troubleshoot issues | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
-| See code examples | [docs/EXAMPLES.md](docs/EXAMPLES.md) |
-| Contribute code | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Get started** | [Getting Started](GETTING_STARTED.md) |
+| **Learn the architecture** | [Architecture Overview](docs/ARCHITECTURE.md) |
+| **Use the CLI** | [CLI Guide](docs/USAGE/CLI.md) |
+| **Use the GUI** | [GUI Guide](docs/USAGE/GUI.md) |
+| **Use as a Python library** | [Python API](docs/USAGE/PYTHON_API.md) |
+| **Understand workflows** | [Templates Guide](docs/USAGE/TEMPLATES.md) |
+| **Set up for development** | [Development Setup](docs/DEVELOPMENT/SETUP.md) |
+| **Contribute code** | [Contributing Guide](CONTRIBUTING.md) |
+| **View the roadmap** | [Project Roadmap](ROADMAP.md) |
+| **Report security issues** | [Security Policy](SECURITY.md) |
+
+**👉 [Full Documentation Hub →](docs/)**
 
 ---
 
@@ -129,10 +131,23 @@ cd gui && streamlit run app.py
 
 ---
 
-## 📝 License
+## 📝 License & Patent Protection
 
-MIT License (Kheper LLC)
+Symphony-IR is released under the **Apache License 2.0** to enable:
+
+✅ **Wide adoption** — Use in commercial and non-commercial projects
+✅ **Derivative works** — Modify and build upon Symphony-IR
+✅ **Sublicensing** — Include in proprietary products
+✅ **Patent protection** — Explicit patent grant protects you and contributors (critical for AI/ML products)
+
+**What this means for you:**
+- You can use Symphony-IR in closed-source products
+- You must include the original license and copyright notice
+- You receive an explicit patent grant for AI/ML use cases
+- No warranties or liability (see [LICENSE.txt](LICENSE.txt) for details)
+
+For enterprise licensing, partnerships, or support: contact the maintainers
 
 ---
 
-**Ready?** Pick your platform above and get started! → [Windows](GETTING_STARTED_WINDOWS.md) | [macOS](GETTING_STARTED_MACOS.md) | [Linux](GETTING_STARTED_LINUX.md)
+**Ready?** [Get started now →](GETTING_STARTED.md)

@@ -1,0 +1,194 @@
+template_id: "compliance_audit"
+name: "Compliance Audit"
+description: "Structured compliance audit workflow: framework selection, gap analysis, remediation planning, and documentation"
+domain: "compliance"
+industry: "cross-industry"
+difficulty_level: "advanced"
+estimated_duration: "3-6 hours"
+tags: ["compliance", "audit", "soc2", "gdpr", "hipaa", "pci-dss", "iso27001", "governance"]
+required_context: ["organization", "framework"]
+
+nodes:
+  start:
+    summary: "Starting {framework} compliance audit for {organization}"
+    role: "architect"
+    intent: "Conduct {framework} compliance audit for {organization}"
+    phase: "PLANNING"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Define audit scope: systems, processes, and personnel in scope"
+      - "Identify: audit period, evidence collection approach, stakeholders"
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "SOC 2 Type II"
+        description: "Trust Service Criteria: Security, Availability, Confidentiality"
+        next_node_id: "gap_analysis"
+      - id: "B"
+        label: "GDPR / Privacy"
+        description: "Data protection, consent, and rights management"
+        next_node_id: "privacy_assessment"
+      - id: "C"
+        label: "HIPAA / Healthcare"
+        description: "PHI safeguards, breach notification, and BAAs"
+        next_node_id: "gap_analysis"
+      - id: "D"
+        label: "PCI-DSS / Payment"
+        description: "Cardholder data environment protection"
+        next_node_id: "gap_analysis"
+
+  gap_analysis:
+    summary: "Gap analysis for {framework} compliance at {organization}"
+    role: "reviewer"
+    intent: "Perform comprehensive gap analysis against {framework} requirements for {organization}"
+    phase: "REVIEW"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Map: current controls to framework requirements"
+      - "Classify gaps: Not Implemented, Partially Implemented, Fully Implemented"
+      - "Prioritize by: risk level and compliance deadline"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Create Remediation Roadmap"
+        description: "Plan to close compliance gaps by deadline"
+        next_node_id: "remediation_roadmap"
+      - id: "B"
+        label: "Identify Quick Wins"
+        description: "Low-effort, high-impact controls to implement first"
+        next_node_id: "quick_wins"
+      - id: "C"
+        label: "Risk Acceptance Review"
+        description: "Document acceptable risk for gaps that won't be fixed"
+        next_node_id: "risk_acceptance"
+
+  privacy_assessment:
+    summary: "Privacy and GDPR assessment for {organization}"
+    role: "reviewer"
+    intent: "Assess {organization} privacy practices against GDPR/CCPA requirements"
+    phase: "REVIEW"
+    priority: 9
+    context_refs: []
+    constraints:
+      - "Map: personal data flows (data inventory and mapping)"
+      - "Assess: lawful basis for processing, consent mechanisms"
+      - "Evaluate: data subject rights implementation (access, deletion, portability)"
+      - "Review: data retention, third-party processors, DPAs"
+    token_budget_hint: 2000
+    options:
+      - id: "A"
+        label: "Create Compliance Roadmap"
+        description: "Prioritized plan to achieve GDPR compliance"
+        next_node_id: "remediation_roadmap"
+      - id: "B"
+        label: "DPIA (Data Protection Impact Assessment)"
+        description: "Risk assessment for high-risk processing activities"
+        next_node_id: "dpia"
+
+  remediation_roadmap:
+    summary: "Creating {framework} remediation roadmap for {organization}"
+    role: "architect"
+    intent: "Build phased remediation roadmap to achieve {framework} compliance for {organization}"
+    phase: "SYNTHESIS"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Phase 1 (30 days): Critical gaps that create audit failure risk"
+      - "Phase 2 (90 days): High-priority operational controls"
+      - "Phase 3 (180 days): Documentation and evidence collection maturity"
+      - "Assign: owner, effort estimate, and acceptance criteria per item"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Generate Policy Templates"
+        description: "Draft required policies and procedures"
+        next_node_id: "policy_generation"
+      - id: "B"
+        label: "Create Evidence Checklist"
+        description: "List all evidence needed for audit"
+        next_node_id: "evidence_checklist"
+
+  quick_wins:
+    summary: "Identifying quick compliance wins for {organization}"
+    role: "researcher"
+    intent: "Identify lowest-effort, highest-impact {framework} controls for rapid compliance improvement"
+    phase: "RESEARCH"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Criteria: implementable within 1-2 weeks with minimal resources"
+      - "Prioritize: controls blocking audit readiness or high audit weight"
+      - "Include: step-by-step implementation guidance for each"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Implement Quick Wins"
+        description: "Create implementation plan for identified quick wins"
+        next_node_id: "remediation_roadmap"
+
+  risk_acceptance:
+    summary: "Risk acceptance documentation for {framework} gaps"
+    role: "architect"
+    intent: "Document formal risk acceptance for {framework} compliance gaps at {organization}"
+    phase: "SYNTHESIS"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "For each accepted risk: description, compensating controls, business justification"
+      - "Risk owner sign-off: named executive approving each accepted risk"
+      - "Review schedule: quarterly review of accepted risks"
+    token_budget_hint: 1200
+    options: []
+
+  dpia:
+    summary: "Data Protection Impact Assessment for {organization}"
+    role: "reviewer"
+    intent: "Conduct DPIA for high-risk personal data processing activities at {organization}"
+    phase: "REVIEW"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "Describe: processing activity, purpose, legal basis"
+      - "Assess: necessity, proportionality, and data minimization"
+      - "Identify: privacy risks and mitigating measures"
+      - "Document: DPO consultation if required"
+    token_budget_hint: 1800
+    options:
+      - id: "A"
+        label: "Create Remediation Roadmap"
+        description: "Address DPIA findings in compliance roadmap"
+        next_node_id: "remediation_roadmap"
+
+  policy_generation:
+    summary: "Generating compliance policies for {organization}"
+    role: "implementer"
+    intent: "Draft required {framework} policies and procedures for {organization}"
+    phase: "IMPLEMENTATION"
+    priority: 7
+    context_refs: []
+    constraints:
+      - "Generate: Information Security Policy, Incident Response Plan, Access Control Policy"
+      - "Tailor: policies to organization size and industry"
+      - "Include: version control, owner, review schedule in each policy"
+    token_budget_hint: 3000
+    options:
+      - id: "A"
+        label: "Create Evidence Checklist"
+        description: "List all evidence needed to support policies"
+        next_node_id: "evidence_checklist"
+
+  evidence_checklist:
+    summary: "Creating audit evidence checklist for {framework}"
+    role: "integrator"
+    intent: "Compile comprehensive evidence checklist required for {framework} audit of {organization}"
+    phase: "SYNTHESIS"
+    priority: 8
+    context_refs: []
+    constraints:
+      - "List every control with: evidence type, collection method, frequency"
+      - "Include: screenshots, logs, configs, reports, approvals needed"
+      - "Flag: automated vs manual evidence collection opportunities"
+    token_budget_hint: 1800
+    options: []

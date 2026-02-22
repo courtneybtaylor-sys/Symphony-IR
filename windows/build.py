@@ -1,125 +1,209 @@
+# Copyright 2024 Kheper LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
-Build Symphony-IR as a standalone Windows executable with PyInstaller
+Build Symphony-IR as a standalone executable with PyInstaller
 
 Usage:
-    python windows/build.py
+    python windows/build.py                  # auto-detect platform
+    python windows/build.py --platform win   # Windows EXE
+    python windows/build.py --platform mac   # macOS .app
+    python windows/build.py --platform linux # Linux binary
+    python windows/build.py --onedir         # directory bundle (faster, needed for AppImage)
 
 This creates:
-    - dist/Symphony-IR.exe (portable application)
-    - dist/Symphony-IR/ (application directory)
+    - dist/Symphony-IR.exe        (Windows, --onefile)
+    - dist/Symphony-IR.app        (macOS,   --onefile / app bundle)
+    - dist/Symphony-IR            (Linux,   --onefile)
+    - dist/Symphony-IR/           (all platforms, --onedir)
 """
 
 import os
 import sys
 import shutil
+import argparse
 from pathlib import Path
-import PyInstaller.__main__
 
-# Determine paths
 PROJECT_ROOT = Path(__file__).parent.parent
-GUI_DIR = PROJECT_ROOT / "gui"
-BUILD_DIR = PROJECT_ROOT / "build"
-DIST_DIR = PROJECT_ROOT / "dist"
+GUI_DIR      = PROJECT_ROOT / "gui"
+BUILD_DIR    = PROJECT_ROOT / "build"
+DIST_DIR     = PROJECT_ROOT / "dist"
 
-print("🔨 Building Symphony-IR for Windows...")
-print(f"   Project: {PROJECT_ROOT}")
-print()
 
-# Clean previous builds
-if BUILD_DIR.exists():
-    print("🧹 Cleaning previous builds...")
-    shutil.rmtree(BUILD_DIR)
-if DIST_DIR.exists():
-    shutil.rmtree(DIST_DIR)
+def detect_platform() -> str:
+    if sys.platform == "win32":
+        return "win"
+    if sys.platform == "darwin":
+        return "mac"
+    return "linux"
 
-# PyInstaller spec
-spec = [
-    str(GUI_DIR / "main.py"),
-    # Output
-    f"--name=Symphony-IR",
-    f"--distpath={DIST_DIR}",
-    f"--buildpath={BUILD_DIR}",
-    # Windows
-    "--windowed",  # No console window
-    "--icon=windows/symphony_icon.ico",  # Add icon (optional)
-    # Packages
-    "--hidden-import=PyQt6",
-    "--hidden-import=PyQt6.QtCore",
-    "--hidden-import=PyQt6.QtGui",
-    "--hidden-import=PyQt6.QtWidgets",
-    "--hidden-import=PyQt6.QtCharts",
-    # Data files
-    f"--add-data={PROJECT_ROOT}/docs:docs",
-    f"--add-data={PROJECT_ROOT}/README.md:.",
-    # Optimization
-    "-y",  # Overwrite without asking
-    "--onefile",  # Single executable (takes longer but cleaner)
-    # OR use "--onedir" for faster builds
-]
 
-print("📦 Running PyInstaller...")
-try:
-    PyInstaller.__main__.run(spec)
+def clean_build() -> None:
+    for d in [BUILD_DIR, DIST_DIR]:
+        if d.exists():
+            print(f"  Cleaning: {d}")
+            shutil.rmtree(d)
+
+
+def pyinstaller_args(platform: str, onedir: bool) -> list:
+    spec = [
+        str(GUI_DIR / "main.py"),
+        f"--name=Symphony-IR",
+        f"--distpath={DIST_DIR}",
+        f"--buildpath={BUILD_DIR}",
+        "--hidden-import=PyQt6",
+        "--hidden-import=PyQt6.QtCore",
+        "--hidden-import=PyQt6.QtGui",
+        "--hidden-import=PyQt6.QtWidgets",
+        "--hidden-import=PyQt6.QtCharts",
+        f"--add-data={PROJECT_ROOT / 'docs'}:docs",
+        f"--add-data={PROJECT_ROOT / 'README.md'}:.",
+        "-y",
+    ]
+
+    if onedir:
+        spec.append("--onedir")
+    else:
+        spec.append("--onefile")
+
+    if platform == "win":
+        spec.append("--windowed")
+        icon = PROJECT_ROOT / "windows" / "symphony_icon.ico"
+        if icon.exists():
+            spec.append(f"--icon={icon}")
+
+    elif platform == "mac":
+        spec.append("--windowed")
+        icon = PROJECT_ROOT / "windows" / "symphony_icon.icns"
+        if icon.exists():
+            spec.append(f"--icon={icon}")
+        spec += ["--target-arch", "universal2"]  # Apple Silicon + Intel
+
+    return spec
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Build Symphony-IR standalone executable")
+    parser.add_argument(
+        "--platform",
+        choices=["win", "mac", "linux", "auto"],
+        default="auto",
+        help="Target platform (default: auto-detect)"
+    )
+    parser.add_argument(
+        "--onedir",
+        action="store_true",
+        help="Build directory bundle instead of single file (required for AppImage)"
+    )
+    parser.add_argument(
+        "--no-clean",
+        dest="no_clean",
+        action="store_true",
+        help="Skip cleaning previous build output"
+    )
+    args = parser.parse_args()
+
+    platform = detect_platform() if args.platform == "auto" else args.platform
+    bundle_type = "directory" if args.onedir else "single file"
+
     print()
-    print("✅ Build successful!")
-    print()
-    print("📍 Output locations:")
-    print(f"   Executable: {DIST_DIR}/Symphony-IR.exe")
-    print(f"   Directory:  {DIST_DIR}/Symphony-IR/")
-    print()
-    print("🚀 To run:")
-    print(f"   {DIST_DIR}/Symphony-IR.exe")
+    print("=" * 60)
+    print(f"  Symphony-IR PyInstaller Builder")
+    print(f"  Platform : {platform.upper()}")
+    print(f"  Bundle   : {bundle_type}")
+    print("=" * 60)
     print()
 
-except Exception as e:
-    print(f"❌ Build failed: {e}")
-    sys.exit(1)
+    if not args.no_clean:
+        print("Cleaning previous builds...")
+        clean_build()
+        print()
 
-# Create additional files
-print("📄 Creating additional files...")
+    try:
+        import PyInstaller.__main__ as pyi
+    except ImportError:
+        print("ERROR: PyInstaller is not installed.")
+        print("  pip install -r gui/requirements-build.txt")
+        sys.exit(1)
 
-# Create a README for distribution
-readme_content = """# Symphony-IR - AI Orchestrator
+    spec = pyinstaller_args(platform, args.onedir)
 
-This is a standalone Windows executable for Symphony-IR.
+    print("Running PyInstaller...")
+    try:
+        pyi.run(spec)
+    except SystemExit as e:
+        if e.code != 0:
+            print(f"\nERROR: PyInstaller failed (exit {e.code})")
+            sys.exit(1)
 
-## First Run
+    print()
+    print("Build successful!")
+    print()
 
-1. Run Symphony-IR.exe
-2. Go to Settings tab
-3. Choose your AI provider (Claude or Ollama)
-4. Start creating AI workflows
+    # Report outputs
+    if args.onedir:
+        out = DIST_DIR / "Symphony-IR"
+        print(f"  Directory : {out}/")
+    else:
+        suffix = {"win": ".exe", "mac": ".app", "linux": ""}.get(platform, "")
+        out = DIST_DIR / f"Symphony-IR{suffix}"
+        print(f"  Executable: {out}")
 
-## Requirements
+    print()
 
-### For Claude (Cloud AI)
-- Anthropic API key (get from https://console.anthropic.com)
-- Internet connection
-- Free to paid tiers available
+    # Post-build hints
+    if platform == "win":
+        print("  Next steps:")
+        print("    python windows/build_innosetup.py    # create installer")
+        print("    python windows/sign_executable.py dist/Symphony-IR.exe")
+    elif platform == "mac":
+        print("  Next steps:")
+        print("    python windows/build_dmg.py          # create DMG")
+        print("    python windows/sign_macos.py dist/Symphony-IR.app --notarize")
+    else:
+        print("  Next steps:")
+        print("    python windows/build_appimage.py     # create AppImage")
+        print("    python windows/sign_linux.py dist/Symphony-IR-1.0.0-x86_64.AppImage")
 
-### For Ollama (Local AI - Free)
-- Ollama installed (https://ollama.ai)
-- ~4-45GB disk space for models
-- No API key needed
-- Completely free
+    print()
 
-## Getting Help
+    # Create distribution README
+    readme = DIST_DIR / "README.txt"
+    readme.write_text("""\
+Symphony-IR — AI Orchestrator
+==============================
 
-- Documentation: See docs/ folder
-- GitHub: https://github.com/courtneybtaylor-sys/Symphony-IR
-- Issues: https://github.com/courtneybtaylor-sys/Symphony-IR/issues
+First Run
+---------
+1. Launch Symphony-IR
+2. Follow the setup wizard to choose your AI provider
+3. Start creating AI workflows
 
-## System Requirements
+AI Providers
+------------
+Claude  — Cloud AI, free tier available (console.anthropic.com)
+Ollama  — Local, free (ollama.ai), no API key needed
 
-- Windows 10 or later
-- 4GB+ RAM (8GB+ for best experience)
-- 500MB disk space for application
-- Optional: GPU for faster Ollama inference
+System Requirements
+-------------------
+Windows : Windows 10+, 4GB+ RAM
+macOS   : 10.14+, 4GB+ RAM
+Linux   : glibc 2.29+, 4GB+ RAM
 
-Enjoy using Symphony-IR!
-"""
+Support: https://github.com/courtneybtaylor-sys/Symphony-IR
+""")
 
-with open(DIST_DIR / "README.txt", "w") as f:
-    f.write(readme_content)
 
-print("✅ All done!")
+if __name__ == "__main__":
+    main()

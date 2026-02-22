@@ -1,0 +1,246 @@
+name: Build & Sign Release
+
+# Trigger on release tag creation (e.g. v1.2.3)
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 1.2.3)"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────
+  # Windows — build + sign with signtool
+  # ───────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows Installer (Signed)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        run: |
+          pip install -r gui/requirements-build.txt
+          pip install -r gui/requirements-desktop.txt
+
+      - name: Build PyInstaller executable
+        run: python windows/build_pyinstaller.py
+
+      - name: Decode and write certificate
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
+        env:
+          CERT_B64: ${{ secrets.WINDOWS_CERT_PFX_B64 }}
+        run: |
+          mkdir -p windows/certificates
+          echo "$env:CERT_B64" | base64 --decode > windows/certificates/windows-cert.pfx
+        shell: pwsh
+
+      - name: Sign executable
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
+        env:
+          SIGN_CERT_PATH: windows/certificates/windows-cert.pfx
+          SIGN_CERT_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: python windows/sign_executable.py dist/Symphony-IR.exe
+
+      - name: Skip executable signing (certificate not configured)
+        if: secrets.WINDOWS_CERT_PFX_B64 == ''
+        run: echo "⚠️  Windows executable signing skipped (WINDOWS_CERT_PFX_B64 secret not configured)"
+
+      - name: Build Inno Setup installer
+        run: python windows/build_innosetup.py
+
+      - name: Sign installer
+        if: secrets.WINDOWS_CERT_PFX_B64 != ''
+        env:
+          SIGN_CERT_PATH: windows/certificates/windows-cert.pfx
+          SIGN_CERT_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $installer = Get-ChildItem installer_output -Filter "*.exe" | Select-Object -First 1
+          python windows/sign_executable.py "$($installer.FullName)"
+        shell: pwsh
+
+      - name: Skip installer signing (certificate not configured)
+        if: secrets.WINDOWS_CERT_PFX_B64 == ''
+        run: echo "⚠️  Windows installer signing skipped (WINDOWS_CERT_PFX_B64 secret not configured)"
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: installer_output/*.exe
+
+  # ───────────────────────────────────────────────────────────────────
+  # macOS — build + sign + notarize
+  # ───────────────────────────────────────────────────────────────────
+  build-macos:
+    name: macOS DMG (Signed + Notarized)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependencies
+        run: pip install -r gui/requirements-build.txt dmgbuild
+
+      - name: Import Apple Developer certificate
+        if: secrets.APPLE_CERT_P12_B64 != ''
+        env:
+          APPLE_CERT_P12_B64: ${{ secrets.APPLE_CERT_P12_B64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+        run: |
+          echo "$APPLE_CERT_P12_B64" | base64 --decode > /tmp/apple-cert.p12
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import /tmp/apple-cert.p12 -k build.keychain -P "$APPLE_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
+          rm /tmp/apple-cert.p12
+
+      - name: Build PyInstaller app bundle
+        run: python windows/build_pyinstaller.py
+
+      - name: Sign .app bundle
+        if: secrets.APPLE_CERT_P12_B64 != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+        run: python windows/sign_macos.py dist/Symphony-IR.app
+
+      - name: Build DMG
+        run: python windows/build_dmg.py
+
+      - name: Sign DMG
+        if: secrets.APPLE_CERT_P12_B64 != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+        run: python windows/sign_macos.py dist/Symphony-IR.dmg
+
+      - name: Notarize DMG
+        if: secrets.APPLE_CERT_P12_B64 != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_APPLE_ID: ${{ secrets.APPLE_APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: python windows/sign_macos.py dist/Symphony-IR.dmg --notarize
+
+      - name: Skip macOS signing (certificate not configured)
+        if: secrets.APPLE_CERT_P12_B64 == ''
+        run: echo "⚠️  macOS signing/notarization skipped (APPLE_CERT_P12_B64 secret not configured)"
+
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/*.dmg
+
+  # ───────────────────────────────────────────────────────────────────
+  # Linux — build AppImage + GPG sign
+  # ───────────────────────────────────────────────────────────────────
+  build-linux:
+    name: Linux AppImage (GPG Signed)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build and AppImage dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y fuse libfuse2 gnupg
+          pip install -r gui/requirements-build.txt
+          # Download appimagetool
+          wget -qO /usr/local/bin/appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /usr/local/bin/appimagetool
+
+      - name: Build PyInstaller executable
+        run: python windows/build_pyinstaller.py
+
+      - name: Build AppImage
+        run: python windows/build_appimage.py
+
+      - name: Import GPG signing key
+        if: secrets.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+
+      - name: Sign AppImage
+        if: secrets.GPG_PRIVATE_KEY != ''
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          python windows/sign_linux.py dist/Symphony-IR.AppImage
+          python windows/sign_linux.py --export-key
+
+      - name: Skip Linux signing (GPG key not configured)
+        if: secrets.GPG_PRIVATE_KEY == ''
+        run: echo "⚠️  Linux AppImage GPG signing skipped (GPG_PRIVATE_KEY secret not configured)"
+
+      - name: Upload Linux AppImage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: |
+            dist/*.AppImage
+            dist/*.AppImage.sig
+            dist/*.AppImage.sha256
+            dist/symphony-ir-release-key.asc
+
+  # ───────────────────────────────────────────────────────────────────
+  # Create GitHub Release with all artifacts
+  # ───────────────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-linux]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/windows-installer/*.exe
+            release-artifacts/macos-dmg/*.dmg
+            release-artifacts/linux-appimage/*.AppImage
+            release-artifacts/linux-appimage/*.AppImage.sig
+            release-artifacts/linux-appimage/*.AppImage.sha256
+            release-artifacts/linux-appimage/*.asc
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
