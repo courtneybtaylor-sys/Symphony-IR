@@ -1,0 +1,203 @@
+template_id: "ml_model_lifecycle"
+name: "ML Model Lifecycle & MLOps"
+description: "Design ML pipelines, model training, evaluation, deployment, and monitoring"
+domain: "Machine Learning"
+target_audience: "ML Engineers, Data Scientists, MLOps Engineers, ML Architects"
+
+nodes:
+  start:
+    summary: "ML Model Development & Deployment"
+    role: "ml_engineer"
+    intent: "Plan ML lifecycle for {model_type} model"
+    phase: "PLANNING"
+    priority: 8
+    context_refs:
+      - "model:{model_type}"
+    constraints: []
+    token_budget_hint: 1100
+    options:
+      - id: "A"
+        label: "Model design & training"
+        description: "Design architecture, select algorithms, prepare data"
+        next_node_id: "model_design"
+      - id: "B"
+        label: "Feature engineering"
+        description: "Design and implement feature pipeline"
+        next_node_id: "feature_engineering"
+      - id: "C"
+        label: "Model evaluation"
+        description: "Define metrics, create test sets, establish baselines"
+        next_node_id: "model_evaluation"
+      - id: "D"
+        label: "MLOps & deployment"
+        description: "Design training automation, CI/CD, monitoring"
+        next_node_id: "mlops_pipeline"
+      - id: "E"
+        label: "Optimize existing model"
+        description: "Review and improve current model"
+        next_node_id: "model_optimization"
+
+  model_design:
+    summary: "ML Model Architecture Design"
+    role: "ml_engineer"
+    intent: "Design {model_type} model for the problem"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Select architecture type (LLM, CNN, RNN, Transformer, Ensemble, XGBoost, etc.)"
+      - "Document hypothesis and expected performance"
+      - "Identify training data requirements (size, quality, balance)"
+      - "Plan data preprocessing and augmentation"
+      - "Define hyperparameter ranges and tuning strategy"
+      - "Estimate computational resources and training time"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Feature engineering"
+        description: "Design feature pipeline"
+        next_node_id: "feature_engineering"
+      - id: "B"
+        label: "Evaluation strategy"
+        description: "Define metrics and validation approach"
+        next_node_id: "model_evaluation"
+
+  feature_engineering:
+    summary: "Feature Pipeline Design"
+    role: "ml_engineer"
+    intent: "Design feature engineering pipeline for {model_type}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Identify raw data sources and transformations needed"
+      - "Design feature extraction and scaling strategies"
+      - "Plan handling of missing values and outliers"
+      - "Design categorical encoding (one-hot, embedding, etc.)"
+      - "Create feature interaction and polynomial features if needed"
+      - "Plan feature monitoring for data drift detection"
+    token_budget_hint: 1300
+    options: []
+
+  model_evaluation:
+    summary: "Model Evaluation & Validation Strategy"
+    role: "ml_engineer"
+    intent: "Define evaluation strategy for {model_type}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Select appropriate metrics (accuracy, F1, AUC, RMSE, etc.)"
+      - "Design cross-validation strategy (k-fold, stratified, time-series)"
+      - "Define train/validation/test split strategy"
+      - "Establish baseline model for comparison"
+      - "Plan A/B testing strategy for production deployment"
+      - "Define success criteria and performance targets"
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "Bias & fairness"
+        description: "Assess and mitigate model bias"
+        next_node_id: "bias_fairness"
+      - id: "B"
+        label: "Model optimization"
+        description: "Tune hyperparameters and optimize"
+        next_node_id: "model_optimization"
+
+  mlops_pipeline:
+    summary: "MLOps & Deployment Pipeline"
+    role: "ml_engineer"
+    intent: "Design MLOps infrastructure for {model_type}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Design data pipeline for continuous training"
+      - "Plan model versioning and experiment tracking"
+      - "Design CI/CD pipeline for model training and testing"
+      - "Plan model registry and artifact management"
+      - "Design deployment strategy (blue-green, canary, shadow)"
+      - "Plan monitoring, alerting, and model drift detection"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Production monitoring"
+        description: "Design model monitoring and rollback"
+        next_node_id: "production_monitoring"
+      - id: "B"
+        label: "Retraining strategy"
+        description: "Plan automated retraining pipeline"
+        next_node_id: "retraining_strategy"
+
+  model_optimization:
+    summary: "Model Optimization & Tuning"
+    role: "ml_engineer"
+    intent: "Optimize performance of {model_type}"
+    phase: "OPTIMIZATION"
+    priority: 7
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Conduct hyperparameter tuning (grid search, Bayesian, random)"
+      - "Analyze feature importance and select most relevant features"
+      - "Assess ensemble techniques for improvement"
+      - "Evaluate model complexity vs performance trade-offs"
+      - "Plan latency optimization if needed for real-time inference"
+    token_budget_hint: 1300
+    options: []
+
+  bias_fairness:
+    summary: "Bias Detection & Fairness Assessment"
+    role: "ml_engineer"
+    intent: "Assess and mitigate bias in {model_type}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Analyze training data for representation and bias"
+      - "Define fairness metrics (demographic parity, equalized odds)"
+      - "Evaluate model performance across demographic groups"
+      - "Document limitations and potential harms"
+      - "Plan bias mitigation techniques (reweighting, synthetic data, etc.)"
+    token_budget_hint: 1100
+    options: []
+
+  production_monitoring:
+    summary: "Production Model Monitoring"
+    role: "ml_engineer"
+    intent: "Design monitoring for {model_type} in production"
+    phase: "DEPLOYMENT"
+    priority: 8
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Design data drift detection (feature and target)"
+      - "Plan prediction quality monitoring"
+      - "Design anomaly detection for predictions"
+      - "Plan automated alerting and escalation"
+      - "Design rollback and failover procedures"
+      - "Plan model retraining triggers and schedules"
+    token_budget_hint: 1200
+    options: []
+
+  retraining_strategy:
+    summary: "Automated Retraining Pipeline"
+    role: "ml_engineer"
+    intent: "Design automated retraining pipeline for {model_type}"
+    phase: "DEPLOYMENT"
+    priority: 7
+    context_refs:
+      - "model:{model_type}"
+    constraints:
+      - "Define retraining trigger criteria (time-based, drift-based)"
+      - "Design data collection and labeling pipeline"
+      - "Plan automated model evaluation and validation"
+      - "Design model promotion and deployment automation"
+      - "Plan fallback to previous model version if needed"
+    token_budget_hint: 1100
+    options: []
