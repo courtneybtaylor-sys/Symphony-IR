@@ -1,0 +1,137 @@
+template_id: "security_audit"
+name: "Security Audit & Threat Assessment"
+description: "Guided security review with OWASP Top 10, vulnerability analysis, and compliance assessment"
+domain: "Security"
+target_audience: "Security Engineers, DevSecOps, Compliance Officers"
+
+nodes:
+  start:
+    summary: "Security Audit Kickoff"
+    role: "security_analyst"
+    intent: "Perform comprehensive security audit of {target}"
+    phase: "ASSESSMENT"
+    priority: 9
+    context_refs:
+      - "file:{target}"
+    constraints: []
+    token_budget_hint: 1200
+    options:
+      - id: "A"
+        label: "OWASP Top 10 focus"
+        description: "Review against OWASP Top 10 2023 vulnerabilities"
+        next_node_id: "owasp_review"
+      - id: "B"
+        label: "Infrastructure security"
+        description: "Audit cloud/network/database security"
+        next_node_id: "infra_security"
+      - id: "C"
+        label: "API security"
+        description: "Analyze REST/GraphQL API security"
+        next_node_id: "api_security"
+      - id: "D"
+        label: "Data protection & compliance"
+        description: "Review data handling, privacy, regulatory compliance"
+        next_node_id: "compliance_check"
+
+  owasp_review:
+    summary: "OWASP Top 10 Vulnerability Review"
+    role: "security_analyst"
+    intent: "Review {target} against OWASP Top 10 2023 vulnerabilities"
+    phase: "ASSESSMENT"
+    priority: 9
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Cover: Injection, Broken Authentication, Broken Access Control, XSS, CSRF, etc."
+      - "Assess impact and likelihood for each finding"
+      - "Provide specific remediation steps"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Identify vulnerabilities"
+        description: "Find specific OWASP issues"
+        next_node_id: "vuln_analysis"
+      - id: "B"
+        label: "Risk assessment"
+        description: "Create risk matrix and prioritization"
+        next_node_id: "risk_matrix"
+
+  infra_security:
+    summary: "Infrastructure Security Assessment"
+    role: "security_analyst"
+    intent: "Audit infrastructure security of {target}"
+    phase: "ASSESSMENT"
+    priority: 8
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Review cloud service configuration (AWS/Azure/GCP)"
+      - "Check network segmentation, firewalls, WAF"
+      - "Validate database hardening and access controls"
+      - "Assess secrets management and encryption"
+    token_budget_hint: 1400
+    options: []
+
+  api_security:
+    summary: "API Security Review"
+    role: "security_analyst"
+    intent: "Perform security audit of REST/GraphQL API {target}"
+    phase: "ASSESSMENT"
+    priority: 8
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Review authentication (JWT, OAuth2, API keys)"
+      - "Check authorization and permission enforcement"
+      - "Validate input validation and rate limiting"
+      - "Assess error handling and information disclosure"
+    token_budget_hint: 1300
+    options: []
+
+  compliance_check:
+    summary: "Data Protection & Compliance Review"
+    role: "security_analyst"
+    intent: "Review {target} for compliance with GDPR, CCPA, PCI-DSS, HIPAA"
+    phase: "ASSESSMENT"
+    priority: 7
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Check data handling and privacy controls"
+      - "Validate encryption at rest and in transit"
+      - "Review audit logging and monitoring"
+      - "Assess incident response and breach notification procedures"
+    token_budget_hint: 1200
+    options: []
+
+  vuln_analysis:
+    summary: "Detailed Vulnerability Analysis"
+    role: "security_analyst"
+    intent: "Analyze specific vulnerabilities in {target}"
+    phase: "ANALYSIS"
+    priority: 10
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Provide proof-of-concept for critical vulnerabilities"
+      - "Include affected code snippets"
+      - "List recommended fixes with implementation complexity"
+      - "Reference CVEs and security bulletins if applicable"
+    token_budget_hint: 1600
+    options: []
+
+  risk_matrix:
+    summary: "Risk Prioritization Matrix"
+    role: "security_analyst"
+    intent: "Create risk matrix for {target} vulnerabilities"
+    phase: "ANALYSIS"
+    priority: 7
+    context_refs:
+      - "file:{target}"
+    constraints:
+      - "Use CVSS score if available"
+      - "Rate impact (1-5) and likelihood (1-5)"
+      - "Prioritize by risk_score = impact × likelihood"
+      - "Include remediation timeline recommendations"
+    token_budget_hint: 1000
+    options: []

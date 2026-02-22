@@ -1,0 +1,274 @@
+template_id: "incident_response"
+name: "Incident Response & Crisis Management"
+description: "Structured incident response playbook and post-incident review (postmortem)"
+domain: "Incident Management"
+target_audience: "Incident Commanders, SREs, DevOps Engineers, On-Call Engineers, Engineering Managers"
+
+nodes:
+  start:
+    summary: "Incident Response Activation"
+    role: "incident_commander"
+    intent: "Respond to {incident_type} incident affecting {service}"
+    phase: "RESPONSE"
+    priority: 10
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints: []
+    token_budget_hint: 1000
+    options:
+      - id: "A"
+        label: "Critical production outage"
+        description: "Application/service completely unavailable"
+        next_node_id: "outage_response"
+      - id: "B"
+        label: "Performance degradation"
+        description: "Service slow but partially available"
+        next_node_id: "perf_response"
+      - id: "C"
+        label: "Security breach"
+        description: "Security incident or data compromise"
+        next_node_id: "breach_response"
+      - id: "D"
+        label: "Data loss event"
+        description: "Data corruption or loss detected"
+        next_node_id: "data_loss_response"
+      - id: "E"
+        label: "Infrastructure failure"
+        description: "Hardware, networking, or database failure"
+        next_node_id: "infra_failure"
+
+  outage_response:
+    summary: "Critical Outage Response"
+    role: "incident_commander"
+    intent: "Respond to critical outage affecting {service}"
+    phase: "RESPONSE"
+    priority: 10
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "IMMEDIATE: Page on-call team and engineering lead"
+      - "IMMEDIATE: Create incident war room (Slack/Teams/Discord)"
+      - "Gather: Error logs, metrics, recent deployments, traffic patterns"
+      - "Triage: Identify root cause hypothesis (code, infrastructure, data)"
+      - "Assess: Impact scope (% users, regions, features affected)"
+      - "Communicate: Send status update to stakeholders (status page)"
+      - "Execute: Implement emergency fix or rollback deployment"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Identify root cause"
+        description: "Deep dive analysis"
+        next_node_id: "root_cause"
+      - id: "B"
+        label: "Implement emergency fix"
+        description: "Deploy hotfix or rollback"
+        next_node_id: "emergency_fix"
+      - id: "C"
+        label: "Escalate / widen response team"
+        description: "Need more resources"
+        next_node_id: "escalation"
+
+  perf_response:
+    summary: "Performance Degradation Response"
+    role: "incident_commander"
+    intent: "Respond to performance degradation in {service}"
+    phase: "RESPONSE"
+    priority: 7
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Assess: Latency, throughput, error rate impact"
+      - "Monitor: Real-time metrics (CPU, memory, network, database)"
+      - "Identify: Is issue in application, database, or infrastructure?"
+      - "Remediate: Scale resources, optimize queries, clear caches"
+      - "Communicate: Send status update with ETA for resolution"
+      - "Validate: Monitor for recovery and user impact improvement"
+    token_budget_hint: 1200
+    options: []
+
+  breach_response:
+    summary: "Security Breach Response"
+    role: "incident_commander"
+    intent: "Respond to security breach: {incident_type}"
+    phase: "RESPONSE"
+    priority: 10
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "CRITICAL: Notify security team and legal immediately"
+      - "Assess: What data exposed? How many users? Severity?"
+      - "Containment: Isolate affected systems, revoke compromised credentials"
+      - "Investigation: Determine attack vector and scope"
+      - "Notify: Prepare user notification and regulatory reporting"
+      - "Remediation: Patch vulnerability, implement additional controls"
+      - "Communication: Prepare public statement and customer communications"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Forensic analysis"
+        description: "Deep security investigation"
+        next_node_id: "forensic_analysis"
+      - id: "B"
+        label: "User notification"
+        description: "Plan customer communication"
+        next_node_id: "user_notification"
+
+  data_loss_response:
+    summary: "Data Loss Event Response"
+    role: "incident_commander"
+    intent: "Respond to data loss: {incident_type} in {service}"
+    phase: "RESPONSE"
+    priority: 10
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "IMMEDIATE: Stop all writes to affected data"
+      - "Assess: Scope of data loss (how many records, types of data)"
+      - "Investigate: Root cause (accidental deletion, corruption, attack)"
+      - "Recovery: Restore from backup or recovery mechanisms"
+      - "Validation: Verify data integrity after recovery"
+      - "Communication: Prepare customer notification"
+      - "Remediation: Implement safeguards (backup verification, RBAC)"
+    token_budget_hint: 1300
+    options: []
+
+  infra_failure:
+    summary: "Infrastructure Failure Response"
+    role: "incident_commander"
+    intent: "Respond to infrastructure failure: {incident_type}"
+    phase: "RESPONSE"
+    priority: 9
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Assess: Component failure (server, database, network, storage)"
+      - "Check: Failover status and redundancy systems"
+      - "Action: Manual failover if automatic failed"
+      - "Monitor: Health of failover systems and overall service"
+      - "Investigation: Determine hardware/software failure cause"
+      - "Prevention: Plan component replacement or code fix"
+    token_budget_hint: 1200
+    options: []
+
+  root_cause:
+    summary: "Root Cause Analysis"
+    role: "incident_commander"
+    intent: "Identify root cause of {incident_type}"
+    phase: "ANALYSIS"
+    priority: 8
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Timeline: Build detailed timeline of events leading to incident"
+      - "Logs: Analyze application, infrastructure, and security logs"
+      - "Metrics: Correlate with system metrics (CPU, memory, network)"
+      - "Code: Review recent changes and deployments"
+      - "Data: Check for data corruption or anomalies"
+      - "Document: Clear, concise root cause summary with evidence"
+    token_budget_hint: 1100
+    options: []
+
+  emergency_fix:
+    summary: "Emergency Fix / Rollback"
+    role: "incident_commander"
+    intent: "Implement emergency fix or rollback for {incident_type}"
+    phase: "REMEDIATION"
+    priority: 9
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Option A: Rollback to last known good version"
+      - "Option B: Deploy hotfix with minimal testing"
+      - "Plan: Rollback procedure and communication"
+      - "Execute: With change control bypass if necessary"
+      - "Verify: Immediate validation of fix effectiveness"
+      - "Monitor: Intensive monitoring for side effects"
+    token_budget_hint: 1000
+    options: []
+
+  escalation:
+    summary: "Incident Escalation"
+    role: "incident_commander"
+    intent: "Escalate response for {incident_type}"
+    phase: "RESPONSE"
+    priority: 8
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Assessment: Current team capacity and expertise"
+      - "Page: Additional on-call engineers, managers, external vendors"
+      - "Communication: Update leadership on escalation and ETA"
+      - "Coordination: Establish roles (incident commander, comms, engineer)"
+      - "Resources: Allocate budget for emergency vendor support if needed"
+    token_budget_hint: 800
+    options: []
+
+  forensic_analysis:
+    summary: "Security Forensic Analysis"
+    role: "incident_commander"
+    intent: "Conduct forensic analysis of {incident_type}"
+    phase: "ANALYSIS"
+    priority: 9
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Preserve: All logs and evidence without modification"
+      - "Timeline: Build precise attack timeline"
+      - "Scope: Determine full extent of breach"
+      - "Attribution: Identify attacker if possible"
+      - "Evidence: Document for potential law enforcement"
+      - "Report: Prepare detailed forensic report for executives/legal"
+    token_budget_hint: 1200
+    options: []
+
+  user_notification:
+    summary: "User Notification & Communication"
+    role: "incident_commander"
+    intent: "Plan user notification for {incident_type}"
+    phase: "COMMUNICATION"
+    priority: 8
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Determine: What to disclose (be transparent but not alarmist)"
+      - "Timing: When to notify users (immediately, after investigation)"
+      - "Channels: Email, SMS, in-app notifications, status page"
+      - "Template: Prepare draft message with key information"
+      - "Legal: Coordinate with legal team on regulatory requirements"
+      - "Follow-up: Plan credit, free month, or other compensation if applicable"
+    token_budget_hint: 900
+    options:
+      - id: "A"
+        label: "Post-incident review"
+        description: "Schedule postmortem meeting"
+        next_node_id: "postmortem"
+
+  postmortem:
+    summary: "Post-Incident Review (Postmortem)"
+    role: "incident_commander"
+    intent: "Conduct postmortem for {incident_type}"
+    phase: "LEARNING"
+    priority: 7
+    context_refs:
+      - "incident:{incident_type}"
+      - "service:{service}"
+    constraints:
+      - "Timing: Schedule within 48 hours (while memory fresh)"
+      - "Participants: Include on-call, engineers, managers, customer success"
+      - "Format: Blameless culture, focus on systems not people"
+      - "Documentation: Timeline, root cause, impact, what went well"
+      - "Actions: 5-10 action items with owners and deadlines"
+      - "Follow-up: Track action items to completion"
+    token_budget_hint: 1000
+    options: []

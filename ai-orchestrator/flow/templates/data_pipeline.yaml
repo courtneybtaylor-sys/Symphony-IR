@@ -1,0 +1,206 @@
+template_id: "data_pipeline"
+name: "Data Pipeline & ETL Design"
+description: "Design data pipelines, ETL processes, data warehouses, and analytics infrastructure"
+domain: "Data Engineering"
+target_audience: "Data Engineers, Data Architects, Analytics Engineers, BigData specialists"
+
+nodes:
+  start:
+    summary: "Data Pipeline Design"
+    role: "data_engineer"
+    intent: "Design data pipeline for {data_source} → {data_sink}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "source:{data_source}"
+      - "sink:{data_sink}"
+    constraints: []
+    token_budget_hint: 1100
+    options:
+      - id: "A"
+        label: "Real-time streaming"
+        description: "Design real-time streaming pipeline (Kafka, Kinesis, Pub/Sub)"
+        next_node_id: "streaming_design"
+      - id: "B"
+        label: "Batch ETL"
+        description: "Design batch ETL process (daily, hourly)"
+        next_node_id: "batch_etl"
+      - id: "C"
+        label: "Data warehouse"
+        description: "Design data warehouse (Snowflake, BigQuery, Redshift)"
+        next_node_id: "warehouse_design"
+      - id: "D"
+        label: "Data lake"
+        description: "Design data lake (S3, ADLS, GCS)"
+        next_node_id: "datalake_design"
+      - id: "E"
+        label: "Optimize existing"
+        description: "Review and optimize current pipeline"
+        next_node_id: "pipeline_optimization"
+
+  streaming_design:
+    summary: "Real-Time Streaming Pipeline"
+    role: "data_engineer"
+    intent: "Design real-time streaming pipeline from {data_source}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "source:{data_source}"
+      - "sink:{data_sink}"
+    constraints:
+      - "Select streaming platform (Kafka, AWS Kinesis, Google Pub/Sub, Azure Event Hubs)"
+      - "Design data format (Avro, Protobuf, JSON)"
+      - "Plan stream processing (Spark, Flink, Kafka Streams)"
+      - "Design for exactly-once semantics if required"
+      - "Plan monitoring, alerting, and dead-letter queues"
+      - "Estimate latency requirements (milliseconds, seconds)"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Performance tuning"
+        description: "Optimize throughput and latency"
+        next_node_id: "perf_tuning"
+      - id: "B"
+        label: "Data quality"
+        description: "Implement validation and quality checks"
+        next_node_id: "data_quality"
+
+  batch_etl:
+    summary: "Batch ETL Process Design"
+    role: "data_engineer"
+    intent: "Design batch ETL pipeline from {data_source} to {data_sink}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "source:{data_source}"
+      - "sink:{data_sink}"
+    constraints:
+      - "Select ETL framework (Apache Airflow, dbt, Spark, pandas)"
+      - "Design extraction logic with incremental loading support"
+      - "Define transformation rules and data validation"
+      - "Design loading strategy (truncate, upsert, merge)"
+      - "Plan scheduling and backfill procedures"
+      - "Include error handling and retry logic"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Data quality"
+        description: "Implement quality checks and anomaly detection"
+        next_node_id: "data_quality"
+      - id: "B"
+        label: "Operational efficiency"
+        description: "Optimize runtime, cost, resource usage"
+        next_node_id: "perf_tuning"
+
+  warehouse_design:
+    summary: "Data Warehouse Design"
+    role: "data_engineer"
+    intent: "Design data warehouse architecture for {data_source}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "source:{data_source}"
+    constraints:
+      - "Select warehouse platform (Snowflake, BigQuery, Redshift, Databricks)"
+      - "Design star/snowflake schema (facts, dimensions)"
+      - "Plan data marts and denormalization strategy"
+      - "Design incremental loading and CDC (Change Data Capture)"
+      - "Plan retention policies and data archival"
+      - "Include performance tuning strategy (indexing, partitioning, clustering)"
+    token_budget_hint: 1500
+    options:
+      - id: "A"
+        label: "Query performance"
+        description: "Optimize query patterns and indexes"
+        next_node_id: "perf_tuning"
+      - id: "B"
+        label: "Cost optimization"
+        description: "Reduce warehouse costs and resource usage"
+        next_node_id: "cost_analysis"
+
+  datalake_design:
+    summary: "Data Lake Architecture"
+    role: "data_engineer"
+    intent: "Design data lake for {data_source}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "source:{data_source}"
+    constraints:
+      - "Select storage platform (S3, Azure Data Lake, Google Cloud Storage)"
+      - "Design directory structure and naming conventions"
+      - "Plan file format (Parquet, ORC, Avro, CSV)"
+      - "Design metadata management (Glue, Hive, Delta Lake)"
+      - "Plan data governance and access controls"
+      - "Include data quality and validation framework"
+    token_budget_hint: 1400
+    options: []
+
+  pipeline_optimization:
+    summary: "Pipeline Performance Optimization"
+    role: "data_engineer"
+    intent: "Optimize performance of {data_source} pipeline"
+    phase: "OPTIMIZATION"
+    priority: 6
+    context_refs:
+      - "source:{data_source}"
+      - "sink:{data_sink}"
+    constraints:
+      - "Analyze execution time and identify bottlenecks"
+      - "Optimize SQL queries and transformations"
+      - "Review resource allocation and parallelization"
+      - "Assess data transfer efficiency"
+      - "Provide cost vs performance trade-off analysis"
+    token_budget_hint: 1200
+    options: []
+
+  data_quality:
+    summary: "Data Quality & Validation Framework"
+    role: "data_engineer"
+    intent: "Implement data quality checks for {data_sink}"
+    phase: "DESIGN"
+    priority: 7
+    context_refs:
+      - "sink:{data_sink}"
+    constraints:
+      - "Define data quality metrics (completeness, accuracy, consistency)"
+      - "Design validation rules for each dataset"
+      - "Plan anomaly detection and alerting"
+      - "Design data quarantine and SLA procedures"
+      - "Document root cause analysis process"
+    token_budget_hint: 1100
+    options: []
+
+  perf_tuning:
+    summary: "Performance Tuning & Optimization"
+    role: "data_engineer"
+    intent: "Tune performance of {data_source} pipeline"
+    phase: "OPTIMIZATION"
+    priority: 7
+    context_refs:
+      - "source:{data_source}"
+    constraints:
+      - "Analyze CPU, memory, I/O bottlenecks"
+      - "Optimize query plans and execution strategies"
+      - "Review caching and materialized views"
+      - "Assess scaling strategy (vertical vs horizontal)"
+      - "Provide performance baselines and benchmarks"
+    token_budget_hint: 1200
+    options: []
+
+  cost_analysis:
+    summary: "Cost Analysis & Optimization"
+    role: "data_engineer"
+    intent: "Analyze and optimize costs for {data_sink}"
+    phase: "OPTIMIZATION"
+    priority: 6
+    context_refs:
+      - "sink:{data_sink}"
+    constraints:
+      - "Calculate storage, compute, and data transfer costs"
+      - "Review pricing models and reserved capacity options"
+      - "Identify cost reduction opportunities"
+      - "Plan cost monitoring and budget alerts"
+      - "Estimate cost impact of performance optimizations"
+    token_budget_hint: 1000
+    options: []

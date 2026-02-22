@@ -1,4 +1,9 @@
 /* Symphony-IR Custom Styles - Dark Theme Capable */
+/*
+ * Colors sourced from gui/design_tokens.json
+ * For SaaS deployments, customize colors via TokenLoader.apply_custom_tokens()
+ * See docs/DESIGN_TOKENS.md for full token documentation
+ */
 
 /* Root variables for theme flexibility */
 :root {

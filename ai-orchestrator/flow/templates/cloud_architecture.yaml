@@ -1,0 +1,156 @@
+template_id: "cloud_architecture"
+name: "Cloud Architecture Design & Optimization"
+description: "Design, review, and optimize cloud infrastructure (AWS, Azure, GCP, multi-cloud)"
+domain: "Cloud Engineering"
+target_audience: "Cloud Architects, Solutions Architects, DevOps Engineers, SREs"
+
+nodes:
+  start:
+    summary: "Cloud Architecture Planning"
+    role: "cloud_architect"
+    intent: "Design cloud infrastructure for {application}"
+    phase: "DESIGN"
+    priority: 8
+    context_refs:
+      - "requirements:{application}"
+    constraints: []
+    token_budget_hint: 1100
+    options:
+      - id: "A"
+        label: "New AWS deployment"
+        description: "Design AWS architecture from scratch"
+        next_node_id: "aws_design"
+      - id: "B"
+        label: "New Azure deployment"
+        description: "Design Azure architecture from scratch"
+        next_node_id: "azure_design"
+      - id: "C"
+        label: "GCP architecture"
+        description: "Design Google Cloud Platform architecture"
+        next_node_id: "gcp_design"
+      - id: "D"
+        label: "Optimize existing"
+        description: "Review and optimize current architecture"
+        next_node_id: "cost_optimization"
+      - id: "E"
+        label: "Multi-cloud strategy"
+        description: "Design multi-cloud or cloud-agnostic architecture"
+        next_node_id: "multi_cloud"
+
+  aws_design:
+    summary: "AWS Architecture Design"
+    role: "cloud_architect"
+    intent: "Design AWS infrastructure for {application}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Select appropriate compute (EC2, Lambda, ECS, EKS)"
+      - "Design database architecture (RDS, DynamoDB, Aurora)"
+      - "Plan networking (VPC, subnets, security groups, ALB/NLB)"
+      - "Include caching, CDN, and storage (S3, EBS) layers"
+      - "Design for high availability and disaster recovery"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Cost optimization"
+        description: "Analyze cost reduction opportunities"
+        next_node_id: "cost_optimization"
+      - id: "B"
+        label: "Security hardening"
+        description: "Review security and compliance"
+        next_node_id: "security_hardening"
+
+  azure_design:
+    summary: "Azure Architecture Design"
+    role: "cloud_architect"
+    intent: "Design Azure infrastructure for {application}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Select compute services (VMs, App Service, AKS, Functions)"
+      - "Design data layer (SQL Database, Cosmos DB, Data Lake)"
+      - "Plan networking (VNet, subnets, NSG, Application Gateway)"
+      - "Include caching (Redis), CDN (Front Door), storage (Blob)"
+      - "Implement high availability and failover strategies"
+    token_budget_hint: 1400
+    options:
+      - id: "A"
+        label: "Cost analysis"
+        description: "Estimate Azure costs"
+        next_node_id: "cost_optimization"
+      - id: "B"
+        label: "Security review"
+        description: "Assess security posture"
+        next_node_id: "security_hardening"
+
+  gcp_design:
+    summary: "Google Cloud Platform Architecture"
+    role: "cloud_architect"
+    intent: "Design GCP infrastructure for {application}"
+    phase: "DESIGN"
+    priority: 9
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Select compute (Compute Engine, App Engine, Cloud Run, GKE)"
+      - "Design data layer (Cloud SQL, Firestore, BigQuery)"
+      - "Plan networking (VPC, subnets, Cloud Load Balancing)"
+      - "Include caching, CDN, and storage solutions"
+      - "Design for scalability and global distribution"
+    token_budget_hint: 1400
+    options: []
+
+  cost_optimization:
+    summary: "Cloud Cost Optimization"
+    role: "cloud_architect"
+    intent: "Identify cost optimization opportunities for {application}"
+    phase: "OPTIMIZATION"
+    priority: 6
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Analyze reserved instances vs on-demand pricing"
+      - "Review storage tiering and archival strategies"
+      - "Assess right-sizing opportunities"
+      - "Calculate ROI for optimization investments"
+      - "Provide monthly/annual cost projections"
+    token_budget_hint: 1200
+    options: []
+
+  security_hardening:
+    summary: "Security Hardening & Compliance"
+    role: "cloud_architect"
+    intent: "Design security controls for {application}"
+    phase: "SECURITY"
+    priority: 9
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Implement IAM and least privilege access"
+      - "Design network security (firewall, WAF, DDoS protection)"
+      - "Plan encryption (at rest, in transit, key management)"
+      - "Design audit logging and monitoring"
+      - "Assess compliance requirements (HIPAA, PCI-DSS, etc.)"
+    token_budget_hint: 1300
+    options: []
+
+  multi_cloud:
+    summary: "Multi-Cloud & Cloud-Agnostic Design"
+    role: "cloud_architect"
+    intent: "Design multi-cloud or cloud-agnostic architecture for {application}"
+    phase: "DESIGN"
+    priority: 7
+    context_refs:
+      - "requirements:{application}"
+    constraints:
+      - "Identify cloud-agnostic components (Kubernetes, containers)"
+      - "Design for portability and avoiding vendor lock-in"
+      - "Plan data replication and synchronization across clouds"
+      - "Document switching/failover procedures"
+      - "Assess operational complexity and cost implications"
+    token_budget_hint: 1300
+    options: []
